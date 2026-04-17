@@ -309,7 +309,7 @@ body {
 .nds-bottom::before { left: 14px; }
 .nds-bottom::after  { right: 14px; }
 
-/* ---- MINI SCREEN (battle log / info) ---- */
+/* ---- BOTTOM SCREEN BEZEL ---- */
 .nds-info-bezel {
   background: var(--screen-bezel);
   border-radius: 5px;
@@ -331,14 +331,26 @@ body {
   pointer-events: none;
   opacity: 0.3;
 }
+
+/* SELECTION AREA — lives inside the bottom NDS screen */
+.selection-area {
+  display: flex;
+  align-items: stretch;
+  background: linear-gradient(to bottom, #0d0d1c, #08080e);
+  flex: 1;
+  overflow: hidden;
+}
 .nds-info-screen {
   background: #060610;
   border-radius: 2px;
   overflow: hidden;
   position: relative;
-  height: clamp(62px, 11dvh, 100px);
   display: flex;
   flex-direction: column;
+}
+/* Card screen is taller than a log screen */
+.nds-info-screen.nds-card-screen {
+  min-height: clamp(140px, 26dvh, 220px);
 }
 /* Scanlines on info screen */
 .nds-info-screen::after {
@@ -356,38 +368,19 @@ body {
   z-index: 10;
 }
 
-.info-screen-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2px 6px;
-  background: linear-gradient(to right, rgba(74,240,200,0.12), rgba(176,74,255,0.08));
-  border-bottom: 1px solid rgba(74,240,200,0.15);
-  flex-shrink: 0;
-}
-.info-screen-title {
-  font-family: var(--font-pixel);
-  font-size: 0.3rem;
-  letter-spacing: 0.1em;
-  color: var(--accent);
-}
-.info-screen-dot {
-  width: 4px; height: 4px;
-  border-radius: 50%;
-  background: var(--accent);
-  animation: ledPulse 2s ease-in-out infinite;
-}
-
-/* Battle log lives in info screen now */
+/* Battle log — in the arena center on the top screen */
 .battle-log {
   flex: 1;
-  background: transparent;
-  border: none;
-  padding: 3px 6px;
+  background: rgba(0,0,0,0.65);
+  border: 1px solid var(--border);
+  padding: 5px 6px;
   font-family: var(--font-mono);
   font-size: clamp(0.38rem, 1.1vw, 0.48rem);
   color: var(--muted);
   line-height: 1.45;
+  width: 100%;
+  min-height: 44px;
+  max-height: clamp(54px, 11vh, 100px);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
@@ -966,7 +959,7 @@ body {
   /* Battle log is now in info screen — arena center is decorative/status only */
 }
 
-/* PHASE BANNER */
+/* PHASE BANNER — top of bottom screen */
 .phase-banner {
   background: var(--p1);
   color: #000;
