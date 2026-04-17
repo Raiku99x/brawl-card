@@ -6,8 +6,8 @@
 
 // ─── SUPABASE CONFIG ───────────────────────
 // Replace these with your own project values from supabase.com
-const SUPABASE_URL = 'https://oikumdcokfhrzuvgmxku.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9pa3VtZGNva2Zocnp1dmdteGt1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4NzA2NTYsImV4cCI6MjA4ODQ0NjY1Nn0.X_PzXZswIFPKZddV24rcSql6PbVoR0vmuKdn3Xh_qAQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 // ───────────────────────────────────────────
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -33,6 +33,7 @@ let onlineRole = null;   // 'p1' or 'p2'
 let onlineChannel = null;
 let onlinePendingMoves = {};
 let onlineOpponentConnected = false;
+let onlineJoinTimeout = null;
 
 // ===== GAME STATE =====
 let state = {
@@ -155,74 +156,91 @@ function showRoomStatus(msg, type = 'waiting') {
 }
 
 // ===== CREATE ROOM =====
+// Pure Realtime broadcast — NO database table required.
+// P1 creates a channel and waits. P2 joins the same channel and sends 'ping'.
+// P1 replies 'pong' to confirm. Then both start the game.
 async function createOnlineRoom() {
   const code = generateRoomCode();
   onlineRoom = code;
   onlineRole = 'p1';
-  showRoomStatus(`ROOM: ${code} — Waiting for opponent...`, 'waiting');
+  showRoomStatus(`ROOM: ${code} — Share this code!`, 'waiting');
   await subscribeToRoom(code);
-  // Insert room record so P2 can verify it exists
-  await supabaseClient.from('rooms').upsert({ id: code, p1_ready: true, p2_ready: false });
 }
 
 // ===== JOIN ROOM =====
 async function joinOnlineRoom(code) {
+  code = code.toUpperCase().trim();
   showRoomStatus(`Connecting to ${code}...`, 'waiting');
-  // Check room exists
-  const { data, error } = await supabaseClient.from('rooms').select('*').eq('id', code).single();
-  if (error || !data) {
-    showRoomStatus(`Room "${code}" not found!`, 'error');
-    return;
-  }
   onlineRoom = code;
   onlineRole = 'p2';
   await subscribeToRoom(code);
-  await supabaseClient.from('rooms').update({ p2_ready: true }).eq('id', code);
-  sendOnlineEvent('player_joined', { role: 'p2' });
+  // After channel is subscribed, ping P1 to confirm room exists
+  // Give the WebSocket a moment to connect before sending
+  setTimeout(() => sendOnlineEvent('ping', { role: 'p2' }), 600);
+  // If no pong after 5 seconds, room doesn't exist / P1 is gone
+  onlineJoinTimeout = setTimeout(() => {
+    if (!onlineOpponentConnected) {
+      showRoomStatus(`Room "${code}" not found or host left!`, 'error');
+      leaveOnlineRoom();
+    }
+  }, 5000);
 }
 
 // ===== SUBSCRIBE TO ROOM =====
-async function subscribeToRoom(code) {
-  if (onlineChannel) onlineChannel.unsubscribe();
+function subscribeToRoom(code) {
+  return new Promise((resolve) => {
+    if (onlineChannel) {
+      onlineChannel.unsubscribe();
+      onlineChannel = null;
+    }
 
-  onlineChannel = supabaseClient.channel(`room:${code}`, {
-    config: { broadcast: { self: false, ack: true } }
-  });
+    onlineChannel = supabaseClient.channel(`brawl:${code}`, {
+      config: { broadcast: { self: false, ack: false } }
+    });
 
-  onlineChannel
-    .on('broadcast', { event: 'player_joined' }, ({ payload }) => {
-      if (onlineRole === 'p1') {
+    onlineChannel
+      // P1 receives ping from P2 → confirms room, sends pong, starts game
+      .on('broadcast', { event: 'ping' }, () => {
+        if (onlineRole !== 'p1') return;
         onlineOpponentConnected = true;
+        clearTimeout(onlineJoinTimeout);
         showRoomStatus(`Opponent connected! Starting...`, 'connected');
+        setTimeout(() => {
+          sendOnlineEvent('pong', {});
+          gameMode = 'online';
+          startGame();
+          showScreen('game');
+        }, 600);
+      })
+      // P2 receives pong from P1 → room confirmed, start game
+      .on('broadcast', { event: 'pong' }, () => {
+        if (onlineRole !== 'p2') return;
+        onlineOpponentConnected = true;
+        clearTimeout(onlineJoinTimeout);
+        showRoomStatus(`Connected! Starting...`, 'connected');
         setTimeout(() => {
           gameMode = 'online';
           startGame();
           showScreen('game');
-          sendOnlineEvent('game_start', {});
-        }, 800);
-      }
-    })
-    .on('broadcast', { event: 'game_start' }, () => {
-      if (onlineRole === 'p2') {
-        gameMode = 'online';
+        }, 600);
+      })
+      .on('broadcast', { event: 'move' }, ({ payload }) => {
+        handleOnlineMove(payload.role, payload.move);
+      })
+      .on('broadcast', { event: 'rematch' }, () => {
         startGame();
         showScreen('game');
-      }
-    })
-    .on('broadcast', { event: 'move' }, ({ payload }) => {
-      handleOnlineMove(payload.role, payload.move);
-    })
-    .on('broadcast', { event: 'rematch' }, () => {
-      startGame();
-      showScreen('game');
-    })
-    .subscribe();
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') resolve();
+      });
+  });
 }
 
 // ===== SEND ONLINE EVENT =====
-async function sendOnlineEvent(event, payload) {
+function sendOnlineEvent(event, payload) {
   if (!onlineChannel) return;
-  await onlineChannel.send({ type: 'broadcast', event, payload });
+  onlineChannel.send({ type: 'broadcast', event, payload });
 }
 
 // ===== HANDLE INCOMING MOVE =====
@@ -248,6 +266,7 @@ function handleOnlineMove(role, moveKey) {
 
 // ===== LEAVE ROOM =====
 function leaveOnlineRoom() {
+  clearTimeout(onlineJoinTimeout);
   if (onlineChannel) {
     onlineChannel.unsubscribe();
     onlineChannel = null;
