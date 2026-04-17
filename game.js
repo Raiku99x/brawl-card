@@ -317,6 +317,8 @@ function updateModeUI() {
   // Responsive label: use short labels on narrow screens
   const isMobile = window.innerWidth < 400;
 
+  const setTitle = (el, text, color = '') => { if (el) { el.textContent = text; el.style.color = color; } };
+
   if (isAI) {
     const label = gameMode === 'easy' ? 'CPU EASY' : gameMode === 'medium' ? 'CPU MEDIUM' : 'CPU HARD';
     const shortLabel = gameMode === 'easy' ? 'CPU — EASY' : gameMode === 'medium' ? 'CPU — MED' : 'CPU — HARD';
@@ -324,10 +326,8 @@ function updateModeUI() {
     els.p1Name.className = 'fighter-name p1-color';
     els.p2Name.textContent = isMobile ? shortLabel : label;
     els.p2Name.className = 'fighter-name cpu-color';
-    els.p2PanelTitle.textContent = isMobile ? '🤖 CPU' : '🤖 CPU — LOCKED IN';
-    els.p2PanelTitle.style.color = 'var(--cpu)';
-    els.p1PanelTitle.textContent = isMobile ? '⚡ P1 — PICK' : '⚡ PLAYER 1 — CHOOSE';
-    els.p1PanelTitle.style.color = '';
+    setTitle(els.p2PanelTitle, isMobile ? '🤖 CPU' : '🤖 CPU — LOCKED IN', 'var(--cpu)');
+    setTitle(els.p1PanelTitle, isMobile ? '⚡ P1 — PICK' : '⚡ PLAYER 1 — CHOOSE');
     els.p2Sprite.classList.add('cpu-sprite');
     els.p2Sprite.classList.remove('online-sprite');
     els.modeBadge.textContent = isMobile ? `VS CPU·${gameMode.toUpperCase()}` : `VS CPU · ${gameMode.toUpperCase()}`;
@@ -338,10 +338,8 @@ function updateModeUI() {
     els.p2Name.textContent = myRole === 'p2' ? (isMobile ? '🔥 YOU' : '🔥 YOU (P2)') : '🔥 OPP';
     els.p1Name.className = 'fighter-name p1-color';
     els.p2Name.className = 'fighter-name online-color';
-    els.p2PanelTitle.textContent = isMobile ? '🌐 OPP' : '🌐 OPPONENT — CHOOSING';
-    els.p2PanelTitle.style.color = 'var(--online)';
-    els.p1PanelTitle.textContent = isMobile ? '⚡ YOU' : '⚡ YOU — CHOOSE';
-    els.p1PanelTitle.style.color = '';
+    setTitle(els.p2PanelTitle, isMobile ? '🌐 OPP' : '🌐 OPPONENT — CHOOSING', 'var(--online)');
+    setTitle(els.p1PanelTitle, isMobile ? '⚡ YOU' : '⚡ YOU — CHOOSE');
     els.p2Sprite.classList.remove('cpu-sprite');
     els.p2Sprite.classList.add('online-sprite');
     els.modeBadge.textContent = isMobile ? `RM:${onlineRoom}` : `ONLINE · ROOM ${onlineRoom}`;
@@ -352,10 +350,8 @@ function updateModeUI() {
     els.p1Name.className = 'fighter-name p1-color';
     els.p2Name.textContent = 'PLAYER 2';
     els.p2Name.className = 'fighter-name p2-color';
-    els.p2PanelTitle.textContent = isMobile ? '🔥 P2 — PICK' : '🔥 PLAYER 2 — CHOOSE';
-    els.p2PanelTitle.style.color = '';
-    els.p1PanelTitle.textContent = isMobile ? '⚡ P1 — PICK' : '⚡ PLAYER 1 — CHOOSE';
-    els.p1PanelTitle.style.color = '';
+    setTitle(els.p2PanelTitle, isMobile ? '🔥 P2 — PICK' : '🔥 PLAYER 2 — CHOOSE');
+    setTitle(els.p1PanelTitle, isMobile ? '⚡ P1 — PICK' : '⚡ PLAYER 1 — CHOOSE');
     els.p2Sprite.classList.remove('cpu-sprite', 'online-sprite');
     els.modeBadge.textContent = '2 PLAYER';
     els.modeBadge.className = 'mode-badge';
@@ -699,11 +695,9 @@ function setPhase(phase) {
       });
 
       if (onlineRole === 'p2') {
-        els.p2PanelTitle.textContent = isMobile ? '🔥 YOU' : '🔥 YOU — CHOOSE';
-        els.p2PanelTitle.style.color = 'var(--p2)';
+        if (els.p2PanelTitle) { els.p2PanelTitle.textContent = isMobile ? '🔥 YOU' : '🔥 YOU — CHOOSE'; els.p2PanelTitle.style.color = 'var(--p2)'; }
       } else {
-        els.p1PanelTitle.textContent = isMobile ? '⚡ YOU' : '⚡ YOU — CHOOSE';
-        els.p1PanelTitle.style.color = 'var(--p1)';
+        if (els.p1PanelTitle) { els.p1PanelTitle.textContent = isMobile ? '⚡ YOU' : '⚡ YOU — CHOOSE'; els.p1PanelTitle.style.color = 'var(--p1)'; }
       }
     } else {
       banner.textContent = isMobile ? '⚡ P1 — CHOOSE' : '⚡ PLAYER 1 — CHOOSE YOUR MOVE';
