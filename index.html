@@ -2,194 +2,226 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#1e1e30" />
   <title>BRAWL CARDS</title>
   <link rel="stylesheet" href="style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Oswald:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Oswald:wght@400;600;700&family=Share+Tech+Mono&family=Press+Start+2P&display=swap" rel="stylesheet"/>
 </head>
 <body>
 
-<!-- SCREEN: TITLE -->
-<div id="screen-title" class="screen active">
-  <div class="title-bg"></div>
-  <div class="title-content">
-    <div class="title-vs-line">
-      <span class="title-char p1-color">P1</span>
-      <span class="title-vs">VS</span>
-      <span class="title-char p2-color">P2</span>
-    </div>
-    <h1 class="game-title">BRAWL<br>CARDS</h1>
-    <p class="title-sub">— STREET COMBAT CARD GAME —</p>
+<!-- CONSOLE SHELL -->
+<div class="console-shell">
 
-    <!-- ONLINE MODE -->
-    <div class="online-section">
-      <div class="online-label">— ONLINE MULTIPLAYER —</div>
-      <div class="online-btns">
-        <button id="btn-create-room" class="btn-online btn-create">⚡ CREATE ROOM</button>
-        <button id="btn-join-room" class="btn-online btn-join">🔥 JOIN ROOM</button>
+  <!-- Brand bar + LEDs -->
+  <div class="console-brand">
+    <span class="console-brand-name">BRAWL SYS</span>
+    <div class="console-indicator">
+      <div class="console-led power"></div>
+      <div class="console-led"></div>
+      <div class="console-led"></div>
+    </div>
+  </div>
+
+  <!-- Screen bezel -->
+  <div class="console-screen-bezel">
+    <div class="bezel-corner tl"></div>
+    <div class="bezel-corner tr"></div>
+    <div class="bezel-corner bl"></div>
+    <div class="bezel-corner br"></div>
+
+    <!-- GAME VIEWPORT -->
+    <div class="console-screen">
+
+      <!-- SCREEN: TITLE -->
+      <div id="screen-title" class="screen active">
+        <div class="title-bg"></div>
+        <div class="title-content">
+          <div class="title-vs-line">
+            <span class="title-char p1-color">P1</span>
+            <span class="title-vs">VS</span>
+            <span class="title-char p2-color">P2</span>
+          </div>
+          <h1 class="game-title">BRAWL<br>CARDS</h1>
+          <p class="title-sub">— STREET COMBAT CARD GAME —</p>
+          <div class="online-section">
+            <div class="online-label">— ONLINE MULTIPLAYER —</div>
+            <div class="online-btns">
+              <button id="btn-create-room" class="btn-online btn-create">⚡ CREATE ROOM</button>
+              <button id="btn-join-room" class="btn-online btn-join">🔥 JOIN ROOM</button>
+            </div>
+            <div id="join-input-wrap" class="join-input-wrap hidden">
+              <input id="join-code-input" class="join-code-input" maxlength="4" placeholder="XXXX"
+                autocomplete="off" autocorrect="off" autocapitalize="characters"
+                spellcheck="false" inputmode="text" />
+              <button id="btn-join-confirm" class="btn-online btn-join">JOIN</button>
+            </div>
+            <div id="room-status" class="room-status hidden"></div>
+          </div>
+          <button id="btn-start" class="btn-main" style="margin-top:10px">2 PLAYER LOCAL</button>
+          <div class="ai-mode-section">
+            <div class="ai-mode-label">— VS CPU —</div>
+            <div class="ai-difficulty-row">
+              <button class="btn-difficulty" data-diff="easy">EASY</button>
+              <button class="btn-difficulty" data-diff="medium">MEDIUM</button>
+              <button class="btn-difficulty" data-diff="hard">HARD</button>
+            </div>
+          </div>
+          <button id="btn-rules" class="btn-secondary">HOW TO PLAY</button>
+        </div>
       </div>
-      <div id="join-input-wrap" class="join-input-wrap hidden">
-        <input id="join-code-input" class="join-code-input" maxlength="4" placeholder="XXXX" />
-        <button id="btn-join-confirm" class="btn-online btn-join">JOIN</button>
+
+      <!-- SCREEN: RULES -->
+      <div id="screen-rules" class="screen">
+        <div class="rules-panel">
+          <h2 class="panel-title">HOW TO PLAY</h2>
+          <div class="rules-table-wrap">
+            <table class="rules-table">
+              <thead><tr><th>MOVE</th><th>DMG</th><th>PRI</th><th>HEAL</th><th>DEF</th></tr></thead>
+              <tbody>
+                <tr><td>ATK</td><td>2</td><td>0</td><td>—</td><td>—</td></tr>
+                <tr><td>QUICK ATK</td><td>1</td><td>+1</td><td>—</td><td>—</td></tr>
+                <tr><td>HEAVY ATK</td><td>4</td><td>-1</td><td>—</td><td>—</td></tr>
+                <tr><td>BLOCK</td><td>—</td><td>+2</td><td>—</td><td>+2</td></tr>
+                <tr><td>COUNTER</td><td>×2</td><td>-2</td><td>—</td><td>—</td></tr>
+                <tr><td>HEAL</td><td>—</td><td>+2</td><td>+6HP</td><td>—</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="rules-notes">
+            <p><span class="highlight">COUNTER:</span> Enemy attacks first. If enemy damage dealt, it's doubled back. BLOCK/COUNTER/HEAL = no counter damage. <span class="highlight">QUICK ATK cannot be countered</span> — too fast!</p>
+            <p><span class="highlight">HEAL:</span> +6 HP but max HP drops by 2. (e.g. 5/10 → 8/8)</p>
+            <p><span class="highlight">BLOCK:</span> Reduces incoming damage by 2. Great against HEAVY ATK!</p>
+            <p><span class="highlight">TIE PRIORITY:</span> Both actions happen simultaneously.</p>
+            <p><span class="highlight">CPU DIFFICULTIES:</span> Easy = random. Medium = smart logic. Hard = reads your patterns.</p>
+            <p><span class="highlight">ONLINE:</span> Create a room, share the 4-letter code. Both pick secretly — resolves automatically!</p>
+          </div>
+          <button id="btn-rules-back" class="btn-main">BACK</button>
+        </div>
       </div>
-      <div id="room-status" class="room-status hidden"></div>
-    </div>
 
-    <!-- LOCAL MODE -->
-    <button id="btn-start" class="btn-main" style="margin-top:16px">2 PLAYER LOCAL</button>
-    <div class="ai-mode-section">
-      <div class="ai-mode-label">— VS CPU —</div>
-      <div class="ai-difficulty-row">
-        <button class="btn-difficulty" data-diff="easy">EASY</button>
-        <button class="btn-difficulty" data-diff="medium">MEDIUM</button>
-        <button class="btn-difficulty" data-diff="hard">HARD</button>
+      <!-- SCREEN: GAME -->
+      <div id="screen-game" class="screen">
+        <div class="top-bar">
+          <div class="fighter-hud p1-hud">
+            <div class="fighter-name p1-color" id="p1-name">PLAYER 1</div>
+            <div class="hp-bar-wrap"><div class="hp-bar" id="p1-hp-bar"></div></div>
+            <div class="hp-text" id="p1-hp-text">10 / 10</div>
+          </div>
+          <div class="round-info">
+            <div class="round-label">ROUND</div>
+            <div class="round-num" id="round-num">1</div>
+            <div class="mode-badge" id="mode-badge"></div>
+          </div>
+          <div class="fighter-hud p2-hud">
+            <div class="fighter-name p2-color" id="p2-name">PLAYER 2</div>
+            <div class="hp-bar-wrap"><div class="hp-bar" id="p2-hp-bar"></div></div>
+            <div class="hp-text" id="p2-hp-text">10 / 10</div>
+          </div>
+        </div>
+        <div class="arena">
+          <div class="fighter-sprite p1-sprite" id="p1-sprite">
+            <div class="sprite-head"></div>
+            <div class="sprite-body"></div>
+            <div class="sprite-fist left-fist"></div>
+          </div>
+          <div class="arena-center">
+            <div id="battle-log" class="battle-log"></div>
+          </div>
+          <div class="fighter-sprite p2-sprite" id="p2-sprite">
+            <div class="sprite-head"></div>
+            <div class="sprite-body"></div>
+            <div class="sprite-fist right-fist"></div>
+          </div>
+        </div>
+        <div id="poke-dialog" class="poke-dialog hidden">
+          <div id="poke-dialog-text" class="poke-dialog-text"></div>
+          <div id="poke-dialog-arrow" class="poke-dialog-arrow hidden">▼</div>
+        </div>
+        <div id="phase-banner" class="phase-banner hidden">CHOOSE YOUR MOVE</div>
+        <div class="selection-area" id="selection-area">
+          <div class="player-panel" id="p1-panel">
+            <div class="player-panel-title p1-color" id="p1-panel-title">⚡ P1 — CHOOSE</div>
+            <div class="cards-row" id="p1-cards"></div>
+            <div class="selected-display" id="p1-selected-display">— NOT YET CHOSEN —</div>
+          </div>
+          <div class="panel-divider"><div class="divider-icon">⚔</div></div>
+          <div class="player-panel" id="p2-panel">
+            <div class="player-panel-title p2-color" id="p2-panel-title">🔥 P2 — CHOOSE</div>
+            <div class="cards-row" id="p2-cards"></div>
+            <div class="selected-display" id="p2-selected-display">— NOT YET CHOSEN —</div>
+          </div>
+        </div>
+        <div id="cpu-thinking" class="cpu-thinking hidden">
+          <span class="cpu-dots">CPU IS THINKING<span class="dot-anim">...</span></span>
+        </div>
+        <div id="online-waiting" class="cpu-thinking hidden">
+          <span class="cpu-dots">WAITING FOR OPPONENT<span class="dot-anim">...</span></span>
+        </div>
+        <div class="resolve-wrap">
+          <button id="btn-resolve" class="btn-resolve hidden">⚔ RESOLVE ROUND ⚔</button>
+        </div>
       </div>
-    </div>
-    <button id="btn-rules" class="btn-secondary">HOW TO PLAY</button>
-  </div>
-</div>
 
-<!-- SCREEN: RULES -->
-<div id="screen-rules" class="screen">
-  <div class="rules-panel">
-    <h2 class="panel-title">HOW TO PLAY</h2>
-    <div class="rules-table-wrap">
-      <table class="rules-table">
-        <thead>
-          <tr>
-            <th>MOVE</th><th>DMG</th><th>PRIORITY</th><th>HEAL</th><th>DEFENCE</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>ATK</td><td>2</td><td>0</td><td>—</td><td>—</td></tr>
-          <tr><td>QUICK ATK</td><td>1</td><td>+1</td><td>—</td><td>—</td></tr>
-          <tr><td>HEAVY ATK</td><td>4</td><td>-1</td><td>—</td><td>—</td></tr>
-          <tr><td>BLOCK</td><td>—</td><td>+2</td><td>—</td><td>+2</td></tr>
-          <tr><td>COUNTER</td><td>×2</td><td>-2</td><td>—</td><td>—</td></tr>
-          <tr><td>HEAL</td><td>—</td><td>+2</td><td>+6HP</td><td>—</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="rules-notes">
-      <p><span class="highlight">COUNTER:</span> Enemy attacks first. If enemy damage is dealt, it's doubled back. If enemy uses BLOCK, COUNTER, or HEAL — no counter damage. <span class="highlight">QUICK ATK cannot be countered</span> — too fast! Counter wastes your turn.</p>
-      <p><span class="highlight">HEAL:</span> +6 HP but max HP drops by 2. (e.g. 5/10 → 8/8 — healed but capped!)</p>
-      <p><span class="highlight">BLOCK:</span> Reduces incoming damage by 2. Great against HEAVY ATK (4 dmg → 2)!</p>
-      <p><span class="highlight">TIE PRIORITY:</span> Both actions happen simultaneously.</p>
-      <p><span class="highlight">CPU DIFFICULTIES:</span> Easy = random moves. Medium = uses smart logic. Hard = reads patterns and counters your playstyle.</p>
-      <p><span class="highlight">ONLINE MODE:</span> Create a room and share the 4-letter code with your opponent. Both players pick moves secretly — resolves automatically!</p>
-    </div>
-    <button id="btn-rules-back" class="btn-main">BACK</button>
-  </div>
-</div>
-
-<!-- SCREEN: GAME -->
-<div id="screen-game" class="screen">
-
-  <!-- TOP BAR -->
-  <div class="top-bar">
-    <div class="fighter-hud p1-hud">
-      <div class="fighter-name p1-color" id="p1-name">PLAYER 1</div>
-      <div class="hp-bar-wrap">
-        <div class="hp-bar" id="p1-hp-bar"></div>
+      <!-- SCREEN: RESULT -->
+      <div id="screen-result" class="screen">
+        <div class="result-panel">
+          <div class="result-ko">K.O.</div>
+          <div class="result-winner" id="result-winner">PLAYER 1 WINS!</div>
+          <div class="result-sub" id="result-sub">Dominant Victory</div>
+          <button id="btn-rematch" class="btn-main">REMATCH</button>
+          <button id="btn-title" class="btn-secondary">TITLE SCREEN</button>
+        </div>
       </div>
-      <div class="hp-text" id="p1-hp-text">10 / 10</div>
+
+    </div><!-- /console-screen -->
+  </div><!-- /console-screen-bezel -->
+
+  <!-- Bottom controls -->
+  <div class="console-controls">
+    <div class="console-dpad">
+      <div class="dpad-h"></div>
+      <div class="dpad-v"></div>
+      <div class="dpad-center"></div>
     </div>
-    <div class="round-info">
-      <div class="round-label">ROUND</div>
-      <div class="round-num" id="round-num">1</div>
-      <div class="mode-badge" id="mode-badge"></div>
-    </div>
-    <div class="fighter-hud p2-hud">
-      <div class="fighter-name p2-color" id="p2-name">PLAYER 2</div>
-      <div class="hp-bar-wrap">
-        <div class="hp-bar" id="p2-hp-bar"></div>
+    <div class="console-menu-btns">
+      <div class="menu-btn-row">
+        <div class="console-menu-btn"></div>
+        <div class="console-menu-btn"></div>
       </div>
-      <div class="hp-text" id="p2-hp-text">10 / 10</div>
+      <div class="console-logo-center">BRAWL</div>
+    </div>
+    <div class="console-action-btns">
+      <div class="action-btn btn-x">X</div>
+      <div class="action-btn btn-y">Y</div>
+      <div class="action-btn btn-a">A</div>
+      <div class="action-btn btn-b">B</div>
     </div>
   </div>
 
-  <!-- ARENA -->
-  <div class="arena">
-    <div class="fighter-sprite p1-sprite" id="p1-sprite">
-      <div class="sprite-body"></div>
-      <div class="sprite-head"></div>
-      <div class="sprite-fist left-fist"></div>
+  <!-- Speaker grills -->
+  <div class="console-speakers">
+    <div class="speaker-grill">
+      <div class="speaker-dot"></div><div class="speaker-dot"></div>
+      <div class="speaker-dot"></div><div class="speaker-dot"></div>
+      <div class="speaker-dot"></div>
     </div>
-    <div class="arena-center">
-      <div id="battle-log" class="battle-log"></div>
-    </div>
-    <div class="fighter-sprite p2-sprite" id="p2-sprite">
-      <div class="sprite-body"></div>
-      <div class="sprite-head"></div>
-      <div class="sprite-fist right-fist"></div>
+    <div class="speaker-grill">
+      <div class="speaker-dot"></div><div class="speaker-dot"></div>
+      <div class="speaker-dot"></div><div class="speaker-dot"></div>
+      <div class="speaker-dot"></div>
     </div>
   </div>
 
-  <!-- POKÉMON DIALOGUE BOX -->
-  <div id="poke-dialog" class="poke-dialog hidden">
-    <div id="poke-dialog-text" class="poke-dialog-text"></div>
-    <div id="poke-dialog-arrow" class="poke-dialog-arrow hidden">▼</div>
-  </div>
-
-  <!-- PHASE BANNER -->
-  <div id="phase-banner" class="phase-banner hidden">CHOOSE YOUR MOVE</div>
-
-  <!-- SELECTION PANELS -->
-  <div class="selection-area" id="selection-area">
-
-    <!-- P1 CARD SELECTION -->
-    <div class="player-panel" id="p1-panel">
-      <div class="player-panel-title p1-color">⚡ PLAYER 1 — CHOOSE</div>
-      <div class="cards-row" id="p1-cards"></div>
-      <div class="selected-display" id="p1-selected-display">— NOT YET CHOSEN —</div>
-    </div>
-
-    <!-- DIVIDER -->
-    <div class="panel-divider">
-      <div class="divider-icon">⚔</div>
-    </div>
-
-    <!-- P2 CARD SELECTION -->
-    <div class="player-panel" id="p2-panel">
-      <div class="player-panel-title p2-color" id="p2-panel-title">🔥 PLAYER 2 — CHOOSE</div>
-      <div class="cards-row" id="p2-cards"></div>
-      <div class="selected-display" id="p2-selected-display">— NOT YET CHOSEN —</div>
-    </div>
-
-  </div>
-
-  <!-- CPU THINKING OVERLAY -->
-  <div id="cpu-thinking" class="cpu-thinking hidden">
-    <span class="cpu-dots">CPU IS THINKING<span class="dot-anim">...</span></span>
-  </div>
-
-  <!-- ONLINE WAITING OVERLAY -->
-  <div id="online-waiting" class="cpu-thinking hidden">
-    <span class="cpu-dots">WAITING FOR OPPONENT<span class="dot-anim">...</span></span>
-  </div>
-
-  <!-- RESOLVE BUTTON (2P local mode only) -->
-  <div class="resolve-wrap">
-    <button id="btn-resolve" class="btn-resolve hidden">⚔ RESOLVE ROUND ⚔</button>
-  </div>
-
-</div>
-
-<!-- SCREEN: RESULT -->
-<div id="screen-result" class="screen">
-  <div class="result-panel">
-    <div class="result-ko">K.O.</div>
-    <div class="result-winner" id="result-winner">PLAYER 1 WINS!</div>
-    <div class="result-sub" id="result-sub">Dominant Victory</div>
-    <button id="btn-rematch" class="btn-main">REMATCH</button>
-    <button id="btn-title" class="btn-secondary">TITLE SCREEN</button>
-  </div>
-</div>
+  <div class="console-bottom-grip"></div>
+</div><!-- /console-shell -->
 
 <!-- HIT EFFECT OVERLAY -->
 <div id="hit-overlay" class="hit-overlay"></div>
 
-<!-- Supabase CDN -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="game.js"></script>
 </body>
