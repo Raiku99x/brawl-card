@@ -685,6 +685,17 @@ html, body {
   gap: 4px;
 }
 
+/* Single-panel mode: 3-column grid so 6 cards = 2×3 */
+.single-panel .cards-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+}
+.single-panel .cards-row .card {
+  min-width: 0;
+  width: 100%;
+}
+
 /* CARDS */
 .card {
   cursor: pointer;
