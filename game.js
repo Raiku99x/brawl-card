@@ -1,9 +1,3 @@
-// ============================================
-//   BRAWL CARDS — game.js
-//   • Local 2P, CPU modes (unchanged)
-//   • Online multiplayer via Supabase Realtime
-// ============================================
-
 // ─── SUPABASE CONFIG ───────────────────────
 // Replace these with your own project values from supabase.com
 const SUPABASE_URL = 'https://oikumdcokfhrzuvgmxku.supabase.co';
