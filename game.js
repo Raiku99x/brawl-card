@@ -1,10 +1,16 @@
+// ============================================
+//   BRAWL CARDS — game.js
+//   • Local 2P, CPU modes (unchanged)
+//   • Online multiplayer via Supabase Realtime
+// ============================================
+
 // ─── SUPABASE CONFIG ───────────────────────
 // Replace these with your own project values from supabase.com
-const SUPABASE_URL = 'https://oikumdcokfhrzuvgmxku.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9pa3VtZGNva2Zocnp1dmdteGt1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4NzA2NTYsImV4cCI6MjA4ODQ0NjY1Nn0.X_PzXZswIFPKZddV24rcSql6PbVoR0vmuKdn3Xh_qAQ';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 // ───────────────────────────────────────────
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ===== MOVE DEFINITIONS =====
 const MOVES = {
@@ -156,14 +162,14 @@ async function createOnlineRoom() {
   showRoomStatus(`ROOM: ${code} — Waiting for opponent...`, 'waiting');
   await subscribeToRoom(code);
   // Insert room record so P2 can verify it exists
-  await supabase.from('rooms').upsert({ id: code, p1_ready: true, p2_ready: false });
+  await supabaseClient.from('rooms').upsert({ id: code, p1_ready: true, p2_ready: false });
 }
 
 // ===== JOIN ROOM =====
 async function joinOnlineRoom(code) {
   showRoomStatus(`Connecting to ${code}...`, 'waiting');
   // Check room exists
-  const { data, error } = await supabase.from('rooms').select('*').eq('id', code).single();
+  const { data, error } = await supabaseClient.from('rooms').select('*').eq('id', code).single();
   if (error || !data) {
     showRoomStatus(`Room "${code}" not found!`, 'error');
     return;
@@ -171,7 +177,7 @@ async function joinOnlineRoom(code) {
   onlineRoom = code;
   onlineRole = 'p2';
   await subscribeToRoom(code);
-  await supabase.from('rooms').update({ p2_ready: true }).eq('id', code);
+  await supabaseClient.from('rooms').update({ p2_ready: true }).eq('id', code);
   sendOnlineEvent('player_joined', { role: 'p2' });
 }
 
@@ -179,7 +185,7 @@ async function joinOnlineRoom(code) {
 async function subscribeToRoom(code) {
   if (onlineChannel) onlineChannel.unsubscribe();
 
-  onlineChannel = supabase.channel(`room:${code}`, {
+  onlineChannel = supabaseClient.channel(`room:${code}`, {
     config: { broadcast: { self: false } }
   });
 
