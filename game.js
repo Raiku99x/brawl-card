@@ -3,6 +3,7 @@
 //   • Local 2P, CPU modes (unchanged)
 //   • Online multiplayer via Supabase Realtime
 //   • Mobile-responsive fixes
+//   • Card sprite support (p1.png / p2.png)
 // ============================================
 
 // ─── SUPABASE CONFIG ───────────────────────
@@ -95,14 +96,17 @@ const els = {
   roomStatus:     document.getElementById('room-status'),
 };
 
+// Helper to update card label text on the fighter card sprites
+function setCardLabel(spriteEl, text) {
+  const label = spriteEl.querySelector('.card-label');
+  if (label) label.textContent = text;
+}
+
 // ===== SCREEN NAV =====
 function showScreen(name) {
   Object.values(screens).forEach(s => s.classList.remove('active'));
   screens[name].classList.add('active');
-  // Scroll title screen to top on mobile after transitions
-  if (name === 'title') {
-    screens.title.scrollTop = 0;
-  }
+  if (name === 'title') screens.title.scrollTop = 0;
 }
 
 // ===== TITLE SCREEN BUTTONS =====
@@ -142,24 +146,15 @@ els.btnCreateRoom.addEventListener('click', createOnlineRoom);
 els.btnJoinRoom.addEventListener('click', () => {
   els.joinInputWrap.classList.toggle('hidden');
   if (!els.joinInputWrap.classList.contains('hidden')) {
-    // Small delay so keyboard doesn't fight the toggle animation
     setTimeout(() => els.joinCodeInput.focus(), 100);
   }
 });
 els.btnJoinConfirm.addEventListener('click', () => {
   const code = els.joinCodeInput.value.trim().toUpperCase();
-  if (code.length !== 4) {
-    showRoomStatus('Enter a 4-letter room code', 'error');
-    return;
-  }
+  if (code.length !== 4) { showRoomStatus('Enter a 4-letter room code', 'error'); return; }
   joinOnlineRoom(code);
 });
-els.joinCodeInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    els.btnJoinConfirm.click();
-  }
-});
+els.joinCodeInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); els.btnJoinConfirm.click(); } });
 els.joinCodeInput.addEventListener('input', () => {
   els.joinCodeInput.value = els.joinCodeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
 });
@@ -198,15 +193,10 @@ async function joinOnlineRoom(code) {
 // ===== SUBSCRIBE TO ROOM =====
 function subscribeToRoom(code) {
   return new Promise((resolve) => {
-    if (onlineChannel) {
-      onlineChannel.unsubscribe();
-      onlineChannel = null;
-    }
-
+    if (onlineChannel) { onlineChannel.unsubscribe(); onlineChannel = null; }
     onlineChannel = supabaseClient.channel(`brawl:${code}`, {
       config: { broadcast: { self: false, ack: false } }
     });
-
     onlineChannel
       .on('broadcast', { event: 'ping' }, () => {
         if (onlineRole !== 'p1') return;
@@ -225,58 +215,39 @@ function subscribeToRoom(code) {
         onlineOpponentConnected = true;
         clearTimeout(onlineJoinTimeout);
         showRoomStatus(`Connected! Starting...`, 'connected');
-        setTimeout(() => {
-          gameMode = 'online';
-          startGame();
-          showScreen('game');
-        }, 600);
+        setTimeout(() => { gameMode = 'online'; startGame(); showScreen('game'); }, 600);
       })
-      .on('broadcast', { event: 'move' }, ({ payload }) => {
-        handleOnlineMove(payload.role, payload.move);
-      })
-      .on('broadcast', { event: 'rematch' }, () => {
-        startGame();
-        showScreen('game');
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') resolve();
-      });
+      .on('broadcast', { event: 'move' }, ({ payload }) => { handleOnlineMove(payload.role, payload.move); })
+      .on('broadcast', { event: 'rematch' }, () => { startGame(); showScreen('game'); })
+      .subscribe((status) => { if (status === 'SUBSCRIBED') resolve(); });
   });
 }
 
-// ===== SEND ONLINE EVENT =====
 function sendOnlineEvent(event, payload) {
   if (!onlineChannel) return;
   onlineChannel.send({ type: 'broadcast', event, payload });
 }
 
-// ===== HANDLE INCOMING MOVE =====
 function handleOnlineMove(role, moveKey) {
   onlinePendingMoves[role] = moveKey;
-
   if (role !== onlineRole) {
     els.p2SelDisp.textContent = '✓ OPPONENT LOCKED IN';
     els.p2SelDisp.style.color = 'var(--online)';
   }
-
   if (onlinePendingMoves.p1 && onlinePendingMoves.p2) {
     state.p1.move = onlinePendingMoves.p1;
     state.p2.move = onlinePendingMoves.p2;
     onlinePendingMoves = {};
     els.onlineWaiting.classList.add('hidden');
-    showBothPanels(); // Reveal both picks during resolution
+    showBothPanels();
     state.phase = 'both-chosen';
     setTimeout(() => resolveRound(), 300);
   }
 }
 
-// ===== LEAVE ROOM =====
 function leaveOnlineRoom() {
   clearTimeout(onlineJoinTimeout);
-  if (onlineChannel) {
-    onlineChannel.unsubscribe();
-    onlineChannel = null;
-  }
+  if (onlineChannel) { onlineChannel.unsubscribe(); onlineChannel = null; }
   onlineRoom = null;
   onlineRole = null;
   onlinePendingMoves = {};
@@ -313,8 +284,6 @@ function startGame() {
 function updateModeUI() {
   const isAI = ['easy', 'medium', 'hard'].includes(gameMode);
   const isOnline = gameMode === 'online';
-
-  // Responsive label: use short labels on narrow screens
   const isMobile = window.innerWidth < 400;
 
   const setTitle = (el, text, color = '') => { if (el) { el.textContent = text; el.style.color = color; } };
@@ -330,6 +299,8 @@ function updateModeUI() {
     setTitle(els.p1PanelTitle, isMobile ? '⚡ P1 — PICK' : '⚡ PLAYER 1 — CHOOSE');
     els.p2Sprite.classList.add('cpu-sprite');
     els.p2Sprite.classList.remove('online-sprite');
+    setCardLabel(els.p1Sprite, 'P1');
+    setCardLabel(els.p2Sprite, 'CPU');
     els.modeBadge.textContent = isMobile ? `VS CPU·${gameMode.toUpperCase()}` : `VS CPU · ${gameMode.toUpperCase()}`;
     els.modeBadge.className = `mode-badge ${gameMode}`;
   } else if (isOnline) {
@@ -342,6 +313,8 @@ function updateModeUI() {
     setTitle(els.p1PanelTitle, isMobile ? '⚡ YOU' : '⚡ YOU — CHOOSE');
     els.p2Sprite.classList.remove('cpu-sprite');
     els.p2Sprite.classList.add('online-sprite');
+    setCardLabel(els.p1Sprite, myRole === 'p1' ? 'YOU' : 'OPP');
+    setCardLabel(els.p2Sprite, myRole === 'p2' ? 'YOU' : 'OPP');
     els.modeBadge.textContent = isMobile ? `RM:${onlineRoom}` : `ONLINE · ROOM ${onlineRoom}`;
     els.modeBadge.className = 'mode-badge online';
     applyOnlinePanelLayout();
@@ -353,16 +326,16 @@ function updateModeUI() {
     setTitle(els.p2PanelTitle, isMobile ? '🔥 P2 — PICK' : '🔥 PLAYER 2 — CHOOSE');
     setTitle(els.p1PanelTitle, isMobile ? '⚡ P1 — PICK' : '⚡ PLAYER 1 — CHOOSE');
     els.p2Sprite.classList.remove('cpu-sprite', 'online-sprite');
+    setCardLabel(els.p1Sprite, 'P1');
+    setCardLabel(els.p2Sprite, 'P2');
     els.modeBadge.textContent = '2 PLAYER';
     els.modeBadge.className = 'mode-badge';
   }
 }
 
-// Online: grey out opponent's card panel; only show yours
 function applyOnlinePanelLayout() {
   const myPanel = onlineRole === 'p1' ? els.p1Panel : els.p2Panel;
   const oppPanel = onlineRole === 'p1' ? els.p2Panel : els.p1Panel;
-
   myPanel.style.opacity = '1';
   oppPanel.style.opacity = '0.5';
   const oppCards = oppPanel.querySelectorAll('.card');
@@ -384,7 +357,6 @@ async function processDialogQueue() {
   if (dialogQueue.length === 0) { isDialogBusy = false; return; }
   isDialogBusy = true;
   const { text, duration, resolve } = dialogQueue.shift();
-
   els.pokeDialog.classList.remove('hidden');
   els.pokeDialogArrow.classList.add('hidden');
   els.pokeDialogText.textContent = '';
@@ -392,7 +364,6 @@ async function processDialogQueue() {
     els.pokeDialogText.textContent += text[i];
     await delay(22);
   }
-
   if (duration > 0) {
     await delay(duration);
     resolve();
@@ -443,29 +414,22 @@ function buildCards(player) {
     statLine += `<span>P:${move.priority >= 0 ? '+' : ''}${move.priority}</span>`;
 
     card.innerHTML = `
-      <div class="card-emoji">${move.emoji}</div>
       <div class="card-name">${move.name}</div>
       <div class="card-stats">${statLine}</div>
     `;
     card.addEventListener('click', () => selectMove(player, key, card));
-    // Also support touch for faster response on mobile
-    card.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      selectMove(player, key, card);
-    }, { passive: false });
+    card.addEventListener('touchend', (e) => { e.preventDefault(); selectMove(player, key, card); }, { passive: false });
     container.appendChild(card);
   });
 }
 
 // ===== SELECT MOVE =====
 function selectMove(player, moveKey, cardEl) {
-  // Online mode: only allow clicking your own panel
   if (gameMode === 'online') {
     const myCards = onlineRole === 'p1' ? 'p1' : 'p2';
     if (player !== myCards) return;
     if (state.phase === 'resolve') return;
     if (state[player].move !== null) return;
-
     const container = player === 'p1' ? els.p1Cards : els.p2Cards;
     const dispEl    = player === 'p1' ? els.p1SelDisp : els.p2SelDisp;
     container.querySelectorAll('.card').forEach(c => c.classList.remove(`selected-${player}`));
@@ -474,13 +438,10 @@ function selectMove(player, moveKey, cardEl) {
     dispEl.textContent = `✓ ${MOVES[moveKey].name}`;
     dispEl.style.color = player === 'p1' ? 'var(--p1)' : 'var(--p2)';
     lockCards(player);
-
     sendOnlineEvent('move', { role: onlineRole, move: moveKey });
     onlinePendingMoves[onlineRole] = moveKey;
-
     els.onlineWaiting.classList.remove('hidden');
     els.phaseBanner.classList.add('hidden');
-
     if (onlinePendingMoves.p1 && onlinePendingMoves.p2) {
       state.p1.move = onlinePendingMoves.p1;
       state.p2.move = onlinePendingMoves.p2;
@@ -492,20 +453,15 @@ function selectMove(player, moveKey, cardEl) {
     }
     return;
   }
-
-  // Local modes
   if (state.phase === 'p1-choose' && player !== 'p1') return;
   if (state.phase === 'p2-choose' && player !== 'p2') return;
-
   const container = player === 'p1' ? els.p1Cards : els.p2Cards;
   const dispEl    = player === 'p1' ? els.p1SelDisp : els.p2SelDisp;
-
   container.querySelectorAll('.card').forEach(c => c.classList.remove(`selected-${player}`));
   cardEl.classList.add(`selected-${player}`);
   state[player].move = moveKey;
   dispEl.textContent = `✓ ${MOVES[moveKey].name}`;
   dispEl.style.color = player === 'p1' ? 'var(--p1)' : 'var(--p2)';
-
   if (player === 'p1') {
     state.p1MoveHistory.push(moveKey);
     if (state.p1MoveHistory.length > 5) state.p1MoveHistory.shift();
@@ -524,23 +480,18 @@ function selectMove(player, moveKey, cardEl) {
 async function triggerCpuMove() {
   els.cpuThinking.classList.remove('hidden');
   els.phaseBanner.classList.add('hidden');
-
   const thinkTime = gameMode === 'easy' ? 600 : gameMode === 'medium' ? 900 : 1200;
   await delay(thinkTime);
-
   const chosenKey = pickCpuMove();
   state.p2.move = chosenKey;
   state.p2LastMove = chosenKey;
-
   els.p2SelDisp.textContent = `✓ LOCKED`;
   els.p2SelDisp.style.color = 'var(--cpu)';
-
   const p2Cards = els.p2Cards.querySelectorAll('.card');
   p2Cards.forEach(c => {
     if (c.dataset.move === chosenKey) c.classList.add('selected-p2');
     else c.classList.add('disabled');
   });
-
   els.cpuThinking.classList.add('hidden');
   state.phase = 'both-chosen';
   await delay(300);
@@ -562,36 +513,24 @@ function pickEasyMove() {
 }
 
 function pickMediumMove() {
-  const cpuHp = state.p2.hp;
-  const cpuMaxHp = state.p2.maxHp;
+  const cpuHp = state.p2.hp, cpuMaxHp = state.p2.maxHp;
   const cpuHpPct = cpuHp / cpuMaxHp;
   const p1Hp = state.p1.hp;
-
   if (cpuHpPct < 0.35 && cpuMaxHp > 1) return Math.random() < 0.65 ? 'HEAL' : 'BLOCK';
-  if (p1Hp <= 2) {
-    const finishers = ['HEAVY_ATK', 'QUICK_ATK', 'ATK'];
-    return finishers[Math.floor(Math.random() * finishers.length)];
-  }
+  if (p1Hp <= 2) { const f = ['HEAVY_ATK','QUICK_ATK','ATK']; return f[Math.floor(Math.random()*f.length)]; }
   const weights = [
-    { key: 'ATK',       w: 20 },
-    { key: 'QUICK_ATK', w: 25 },
-    { key: 'HEAVY_ATK', w: 20 },
-    { key: 'BLOCK',     w: 20 },
-    { key: 'COUNTER',   w: 10 },
-    { key: 'HEAL',      w: 5  },
+    { key: 'ATK', w: 20 }, { key: 'QUICK_ATK', w: 25 }, { key: 'HEAVY_ATK', w: 20 },
+    { key: 'BLOCK', w: 20 }, { key: 'COUNTER', w: 10 }, { key: 'HEAL', w: 5 },
   ];
   return weightedPick(weights);
 }
 
 function pickHardMove() {
-  const cpuHp = state.p2.hp;
-  const cpuMaxHp = state.p2.maxHp;
+  const cpuHp = state.p2.hp, cpuMaxHp = state.p2.maxHp;
   const cpuHpPct = cpuHp / cpuMaxHp;
   const p1Hp = state.p1.hp;
   const history = state.p1MoveHistory;
-
   if (cpuHpPct < 0.25 && cpuMaxHp > 1) return 'HEAL';
-
   const recentLen = Math.min(history.length, 4);
   const recent = history.slice(-recentLen);
   const blockCount = recent.filter(m => m === 'BLOCK').length;
@@ -599,21 +538,16 @@ function pickHardMove() {
   const quickAtkCount = recent.filter(m => m === 'QUICK_ATK').length;
   const lastIsQuick = lastMove === 'QUICK_ATK';
   const nonQuickAttacks = recent.filter(m => ['ATK','HEAVY_ATK'].includes(m)).length;
-
   if (recentLen >= 2 && nonQuickAttacks >= recentLen - 1 && !lastIsQuick && Math.random() < 0.70) return 'COUNTER';
   if (quickAtkCount >= 2 && Math.random() < 0.6) return 'HEAVY_ATK';
   if (blockCount >= 2 && Math.random() < 0.55) return 'HEAVY_ATK';
   if (lastMove === 'COUNTER' && Math.random() < 0.65) return 'HEAVY_ATK';
   if (lastMove === 'HEAL' && Math.random() < 0.6) return 'QUICK_ATK';
   if (p1Hp <= 3 && Math.random() < 0.5) return 'QUICK_ATK';
-
   const weights = [
-    { key: 'ATK',       w: 10 },
-    { key: 'QUICK_ATK', w: 25 },
-    { key: 'HEAVY_ATK', w: 20 },
-    { key: 'BLOCK',     w: 15 },
-    { key: 'COUNTER',   w: 20 },
-    { key: 'HEAL',      w: cpuHpPct < 0.6 ? 15 : 5 },
+    { key: 'ATK', w: 10 }, { key: 'QUICK_ATK', w: 25 }, { key: 'HEAVY_ATK', w: 20 },
+    { key: 'BLOCK', w: 15 }, { key: 'COUNTER', w: 20 },
+    { key: 'HEAL', w: cpuHpPct < 0.6 ? 15 : 5 },
   ];
   return weightedPick(weights);
 }
@@ -621,10 +555,7 @@ function pickHardMove() {
 function weightedPick(weights) {
   const total = weights.reduce((sum, w) => sum + w.w, 0);
   let r = Math.random() * total;
-  for (const item of weights) {
-    r -= item.w;
-    if (r <= 0) return item.key;
-  }
+  for (const item of weights) { r -= item.w; if (r <= 0) return item.key; }
   return weights[weights.length - 1].key;
 }
 
@@ -644,7 +575,6 @@ function unlockCards(player) {
   dispEl.style.color = '';
 }
 
-// ===== SINGLE PANEL DISPLAY =====
 function showActivePanel(player) {
   const selArea = document.getElementById('selection-area');
   selArea.classList.add('single-panel');
@@ -669,31 +599,19 @@ function setPhase(phase) {
   els.btnResolve.classList.add('hidden');
   els.cpuThinking.classList.add('hidden');
   els.onlineWaiting.classList.add('hidden');
-
   const isMobile = window.innerWidth < 400;
 
   if (phase === 'p1-choose') {
     hideDialog();
-
     if (gameMode === 'online') {
-      unlockCards('p1');
-      unlockCards('p2');
-      state.p1.move = null;
-      state.p2.move = null;
-
+      unlockCards('p1'); unlockCards('p2');
+      state.p1.move = null; state.p2.move = null;
       banner.textContent = isMobile ? '⚡ PICK SECRETLY' : '⚡ PICK YOUR MOVE — OPPONENT PICKS SECRETLY';
       banner.classList.add('online-wait');
-
-      // Only show your panel, hide opponent's entirely
       const myPanel = onlineRole === 'p1' ? 'p1' : 'p2';
       showActivePanel(myPanel);
-
-      // Disable opponent's cards (hidden anyway but keep consistent)
       const oppCards = onlineRole === 'p1' ? els.p2Cards : els.p1Cards;
-      oppCards.querySelectorAll('.card').forEach(c => {
-        c.classList.add('disabled', 'online-hidden');
-      });
-
+      oppCards.querySelectorAll('.card').forEach(c => c.classList.add('disabled', 'online-hidden'));
       if (onlineRole === 'p2') {
         if (els.p2PanelTitle) { els.p2PanelTitle.textContent = isMobile ? '🔥 YOU' : '🔥 YOU — CHOOSE'; els.p2PanelTitle.style.color = 'var(--p2)'; }
       } else {
@@ -701,31 +619,24 @@ function setPhase(phase) {
       }
     } else {
       banner.textContent = isMobile ? '⚡ P1 — CHOOSE' : '⚡ PLAYER 1 — CHOOSE YOUR MOVE';
-      unlockCards('p1');
-      unlockCards('p2');
-      state.p1.move = null;
-      state.p2.move = null;
+      unlockCards('p1'); unlockCards('p2');
+      state.p1.move = null; state.p2.move = null;
       els.p2Cards.querySelectorAll('.card').forEach(c => c.classList.add('disabled'));
       if (gameMode !== '2p') {
         els.p2SelDisp.textContent = '— CPU WILL CHOOSE —';
-        showActivePanel('p1'); // AI: only show player's panel
+        showActivePanel('p1');
       } else {
-        showActivePanel('p1'); // 2P local: show p1 first
+        showActivePanel('p1');
       }
     }
-
   } else if (phase === 'p2-choose') {
     banner.textContent = isMobile ? '🔥 P2 — CHOOSE' : '🔥 PLAYER 2 — CHOOSE YOUR MOVE';
     banner.classList.add('p2-turn');
     els.p2Cards.querySelectorAll('.card').forEach(c => c.classList.remove('disabled'));
-    showActivePanel('p2'); // 2P local: now show p2 panel
-
+    showActivePanel('p2');
   } else if (phase === 'both-chosen') {
     banner.classList.add('hidden');
-    if (gameMode === '2p') {
-      showBothPanels(); // Show both for resolve button in 2P
-      els.btnResolve.classList.remove('hidden');
-    }
+    if (gameMode === '2p') { showBothPanels(); els.btnResolve.classList.remove('hidden'); }
   }
 }
 
@@ -736,14 +647,11 @@ async function resolveRound() {
   if (state.phase !== 'both-chosen') return;
   state.phase = 'resolve';
   els.btnResolve.classList.add('hidden');
-
   const m1 = MOVES[state.p1.move];
   const m2 = MOVES[state.p2.move];
   const p2Label = gameMode === 'online' ? 'OPP' : gameMode !== '2p' ? 'CPU' : 'P2';
-
   logEntry(`— ROUND ${state.round} —`, 'log-info');
   logEntry(`P1: ${m1.name}  |  ${p2Label}: ${m2.name}`, 'log-info');
-
   if (gameMode === 'online') {
     els.p2SelDisp.textContent = `✓ ${m2.name}`;
     const oppCards = onlineRole === 'p1' ? els.p2Cards : els.p1Cards;
@@ -755,10 +663,8 @@ async function resolveRound() {
     });
   }
   if (gameMode !== '2p' && gameMode !== 'online') els.p2SelDisp.textContent = `✓ ${m2.name}`;
-
   const p1Priority = m1.priority;
   const p2Priority = m2.priority;
-
   if (p1Priority === p2Priority) {
     await applySimultaneous(m1, m2);
   } else if (p1Priority > p2Priority) {
@@ -768,53 +674,37 @@ async function resolveRound() {
     await applyTurn('p2', m2, 'p1', m1);
     if (!isGameOver()) await applyTurn('p1', m1, 'p2', m2, true);
   }
-
   updateHUD();
-
-  if (isGameOver()) {
-    await delay(500);
-    endGame();
-    return;
-  }
-
+  if (isGameOver()) { await delay(500); endGame(); return; }
   state.round++;
   els.roundNum.textContent = state.round;
   await delay(200);
   setPhase('p1-choose');
 }
 
-// ===== APPLY SIMULTANEOUS =====
 async function applySimultaneous(m1, m2) {
   const dmg1To2 = calcDamage('p1', m1, 'p2', m2);
   const dmg2To1 = calcDamage('p2', m2, 'p1', m1);
-  const heal1 = m1.heal || 0;
-  const heal2 = m2.heal || 0;
-  const def2 = m2.defence || 0;
-  const def1 = m1.defence || 0;
-
+  const heal1 = m1.heal || 0, heal2 = m2.heal || 0;
+  const def2 = m2.defence || 0, def1 = m1.defence || 0;
   const actual1To2 = Math.max(0, dmg1To2 - def2);
   const actual2To1 = Math.max(0, dmg2To1 - def1);
-
   applyDamage('p2', actual1To2, 'p1', m1);
   applyDamage('p1', actual2To1, 'p2', m2);
   applyHealEffect('p1', heal1, m1);
   applyHealEffect('p2', heal2, m2);
-
   await animateMoves('p1', m1, 'p2', m2, actual1To2, actual2To1);
   updateHUD();
 }
 
-// ===== APPLY TURN =====
 async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = false) {
   const p2Label = gameMode === 'online' ? 'Opponent' : gameMode !== '2p' ? 'CPU' : 'P2';
   const attackerLabel = attacker === 'p1' ? 'Player 1' : p2Label;
   const defenderLabel = defender === 'p1' ? 'Player 1' : p2Label;
-
   const dmg = calcDamage(attacker, atkMove, defender, defMove);
   const heal = atkMove.heal || 0;
   const defenderDef = defMove.defence || 0;
   const actualDmg = Math.max(0, dmg - defenderDef);
-
   if (atkMove.name === 'BLOCK') {
     await showDialog(`${attackerLabel} takes a defensive stance!\nIncoming damage reduced by 2.`, 1600);
   } else if (atkMove.name === 'HEAL') {
@@ -836,25 +726,17 @@ async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = fa
       await showDialog(`${attackerLabel}'s ${atkMove.name} was blocked!\n${defenderLabel}'s guard held firm!`, 1600);
     }
   }
-
   applyDamage(defender, actualDmg, attacker, atkMove);
   applyHealEffect(attacker, heal, atkMove);
   await animateSingleTurn(attacker, atkMove, defender, defMove, actualDmg);
   updateHUD();
 }
 
-// ===== CALC DAMAGE =====
 function calcDamage(attacker, atkMove, defender, defMove) {
   if (atkMove.name === 'COUNTER') {
-    if (defMove.name === 'QUICK ATK') {
-      logEntry(`${attacker.toUpperCase()} COUNTER — too slow for QUICK ATK!`, 'log-info');
-      return 0;
-    }
+    if (defMove.name === 'QUICK ATK') { logEntry(`${attacker.toUpperCase()} COUNTER — too slow for QUICK ATK!`, 'log-info'); return 0; }
     const isDefenderAttacking = ['ATK', 'HEAVY ATK'].includes(defMove.name);
-    if (!isDefenderAttacking) {
-      logEntry(`${attacker.toUpperCase()} COUNTER — no attack to reflect!`, 'log-info');
-      return 0;
-    }
+    if (!isDefenderAttacking) { logEntry(`${attacker.toUpperCase()} COUNTER — no attack to reflect!`, 'log-info'); return 0; }
     const defDmg = defMove.dmg || 0;
     logEntry(`${attacker.toUpperCase()} COUNTERS — reflects ${defDmg * 2} dmg!`, 'log-dmg');
     return defDmg * 2;
@@ -862,7 +744,6 @@ function calcDamage(attacker, atkMove, defender, defMove) {
   return atkMove.dmg || 0;
 }
 
-// ===== APPLY DAMAGE =====
 function applyDamage(target, amount, source, srcMove) {
   if (amount <= 0) return;
   state[target].hp = Math.max(0, state[target].hp - amount);
@@ -874,7 +755,6 @@ function applyDamage(target, amount, source, srcMove) {
   spawnDamageNumber(target, amount, type);
 }
 
-// ===== APPLY HEAL =====
 function applyHealEffect(player, amount, move) {
   if (amount <= 0) return;
   state[player].maxHp = Math.max(1, state[player].maxHp - 2);
@@ -896,10 +776,7 @@ function initParticleCanvas() {
   particleCanvas.height = window.innerHeight;
   particleCtx = particleCanvas.getContext('2d');
   window.addEventListener('resize', () => {
-    if (particleCanvas) {
-      particleCanvas.width = window.innerWidth;
-      particleCanvas.height = window.innerHeight;
-    }
+    if (particleCanvas) { particleCanvas.width = window.innerWidth; particleCanvas.height = window.innerHeight; }
   });
 }
 
@@ -914,15 +791,7 @@ function spawnImpactParticles(x, y, color, count = 18) {
   for (let i = 0; i < count; i++) {
     const angle = (Math.PI * 2 / count) * i + (Math.random() - 0.5) * 0.4;
     const speed = 3 + Math.random() * 6;
-    particles.push({
-      x, y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      life: 1,
-      decay: 0.04 + Math.random() * 0.04,
-      size: 2 + Math.random() * 4,
-      color,
-    });
+    particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 1, decay: 0.04 + Math.random() * 0.04, size: 2 + Math.random() * 4, color });
   }
   animateParticles(particles);
 }
@@ -935,9 +804,7 @@ function animateParticles(particles) {
     particleCtx.fillRect(0, 0, particleCanvas.width, particleCanvas.height);
     alive = false;
     for (const p of particles) {
-      p.x += p.vx; p.y += p.vy;
-      p.vy += 0.18; p.vx *= 0.96;
-      p.life -= p.decay;
+      p.x += p.vx; p.y += p.vy; p.vy += 0.18; p.vx *= 0.96; p.life -= p.decay;
       if (p.life <= 0) continue;
       alive = true;
       particleCtx.globalAlpha = p.life;
@@ -969,15 +836,15 @@ function screenShake(intensity = 8, duration = 600) {
   requestAnimationFrame(shake);
 }
 
+// ─── Card-aware animation helpers (no scaleX flip needed — PNG faces correctly) ───
+
 function zoomPunch(spriteEl, scale = 1.35, duration = 300) {
   return new Promise(resolve => {
-    const isP2 = spriteEl.classList.contains('p2-sprite');
-    const baseScale = isP2 ? 'scaleX(-1)' : '';
     spriteEl.style.transition = `transform ${duration * 0.4}ms cubic-bezier(0.2,1.6,0.4,1)`;
-    spriteEl.style.transform = `${baseScale} scale(${scale})`;
+    spriteEl.style.transform = `scale(${scale})`;
     setTimeout(() => {
       spriteEl.style.transition = `transform ${duration * 0.6}ms ease`;
-      spriteEl.style.transform = baseScale ? baseScale : '';
+      spriteEl.style.transform = '';
       setTimeout(() => { spriteEl.style.transition = ''; spriteEl.style.transform = ''; resolve(); }, duration * 0.6);
     }, duration * 0.4);
   });
@@ -993,14 +860,12 @@ function hitFreeze(duration = 220) {
 
 function lungePunch(spriteEl, direction = 1) {
   return new Promise(resolve => {
-    const isP2 = spriteEl.classList.contains('p2-sprite');
-    const baseFlip = isP2 ? 'scaleX(-1)' : '';
     const dist = direction * 55;
     spriteEl.style.transition = 'transform 180ms cubic-bezier(0.2,1.4,0.4,1)';
-    spriteEl.style.transform = `${baseFlip} translateX(${dist}px) scale(1.15)`;
+    spriteEl.style.transform = `translateX(${dist}px) scale(1.15)`;
     setTimeout(() => {
       spriteEl.style.transition = 'transform 340ms ease';
-      spriteEl.style.transform = baseFlip ? baseFlip : '';
+      spriteEl.style.transform = '';
       setTimeout(() => { spriteEl.style.transition = ''; spriteEl.style.transform = ''; resolve(); }, 340);
     }, 180);
   });
@@ -1008,14 +873,12 @@ function lungePunch(spriteEl, direction = 1) {
 
 function recoilHit(spriteEl, direction = -1) {
   return new Promise(resolve => {
-    const isP2 = spriteEl.classList.contains('p2-sprite');
-    const baseFlip = isP2 ? 'scaleX(-1)' : '';
     const dist = direction * 45;
     spriteEl.style.transition = 'transform 100ms ease';
-    spriteEl.style.transform = `${baseFlip} translateX(${dist}px) scale(0.9)`;
+    spriteEl.style.transform = `translateX(${dist}px) scale(0.9)`;
     setTimeout(() => {
       spriteEl.style.transition = 'transform 500ms cubic-bezier(0.2,1.2,0.4,1)';
-      spriteEl.style.transform = baseFlip ? baseFlip : '';
+      spriteEl.style.transform = '';
       setTimeout(() => { spriteEl.style.transition = ''; spriteEl.style.transform = ''; resolve(); }, 500);
     }, 100);
   });
@@ -1038,7 +901,7 @@ function healGlow(spriteEl) {
   return new Promise(resolve => {
     spriteEl.style.transition = 'filter 300ms ease, transform 300ms ease';
     spriteEl.style.filter = 'brightness(2.5) drop-shadow(0 0 24px #2ecc71) hue-rotate(100deg)';
-    spriteEl.style.transform = spriteEl.classList.contains('p2-sprite') ? 'scaleX(-1) scale(1.3)' : 'scale(1.3)';
+    spriteEl.style.transform = 'scale(1.3)';
     const center = getSpriteCenter(spriteEl);
     spawnHealParticles(center.x, center.y);
     setTimeout(() => {
@@ -1068,11 +931,9 @@ function spawnHealParticles(x, y) {
 
 function blockFlash(spriteEl) {
   return new Promise(resolve => {
-    const isP2 = spriteEl.classList.contains('p2-sprite');
-    const baseFlip = isP2 ? 'scaleX(-1)' : '';
     spriteEl.style.transition = 'filter 150ms, transform 150ms';
     spriteEl.style.filter = 'brightness(2.5) drop-shadow(0 0 20px #4af0c8)';
-    spriteEl.style.transform = `${baseFlip} scale(0.88) translateX(${isP2 ? '-' : ''}8px)`;
+    spriteEl.style.transform = 'scale(0.88) translateX(8px)';
     setTimeout(() => {
       spriteEl.style.transition = 'filter 400ms, transform 400ms';
       spriteEl.style.filter = ''; spriteEl.style.transform = '';
@@ -1087,13 +948,10 @@ async function animateSingleTurn(attacker, atkMove, defender, defMove, dmg) {
   const defSprite = defender === 'p1' ? els.p1Sprite : els.p2Sprite;
   const moveName = atkMove.name;
   const atkDir = attacker === 'p1' ? 1 : -1;
-
   if (moveName === 'HEAL') {
-    await healGlow(atkSprite);
-    await delay(300);
+    await healGlow(atkSprite); await delay(300);
   } else if (moveName === 'BLOCK') {
-    await blockFlash(atkSprite);
-    await delay(200);
+    await blockFlash(atkSprite); await delay(200);
   } else if (moveName === 'COUNTER') {
     if (dmg > 0) {
       await lungePunch(defSprite, atkDir * -1);
@@ -1104,16 +962,10 @@ async function animateSingleTurn(attacker, atkMove, defender, defMove, dmg) {
       await lungePunch(atkSprite, atkDir);
       const center = getSpriteCenter(defSprite);
       spawnImpactParticles(center.x, center.y, '#b04aff', 36);
-      await Promise.all([
-        hitFreeze(400), screenShake(16, 700),
-        spriteFlash(defSprite, '#ff4444', 6),
-        recoilHit(defSprite, atkDir * -1),
-        flashHitCinematic(defender, '#b04aff'),
-      ]);
+      await Promise.all([hitFreeze(400), screenShake(16, 700), spriteFlash(defSprite, '#ff4444', 6), recoilHit(defSprite, atkDir * -1), flashHitCinematic(defender, '#b04aff')]);
       await delay(300);
     } else {
-      spriteFlash(atkSprite, '#555555', 3);
-      await delay(600);
+      spriteFlash(atkSprite, '#555555', 3); await delay(600);
     }
   } else {
     const isHeavy = moveName === 'HEAVY ATK';
@@ -1130,12 +982,7 @@ async function animateSingleTurn(attacker, atkMove, defender, defMove, dmg) {
       const shakeMag  = isHeavy ? 18  : isQuick ? 7   : 10;
       const shakeDur  = isHeavy ? 700 : isQuick ? 350 : 500;
       const flashTimes = isHeavy ? 6  : isQuick ? 3   : 4;
-      await Promise.all([
-        hitFreeze(freezeDur), screenShake(shakeMag, shakeDur),
-        spriteFlash(defSprite, impactColor, flashTimes),
-        recoilHit(defSprite, atkDir * -1),
-        flashHitCinematic(defender, impactColor),
-      ]);
+      await Promise.all([hitFreeze(freezeDur), screenShake(shakeMag, shakeDur), spriteFlash(defSprite, impactColor, flashTimes), recoilHit(defSprite, atkDir * -1), flashHitCinematic(defender, impactColor)]);
       await delay(isHeavy ? 250 : 100);
     }
   }
@@ -1146,7 +993,6 @@ async function animateMoves(p1, m1, p2, m2, dmg1, dmg2) {
   initParticleCanvas();
   const sprite1 = els.p1Sprite;
   const sprite2 = els.p2Sprite;
-
   const lunges = [];
   if (m1.name !== 'BLOCK' && m1.name !== 'HEAL') lunges.push(lungePunch(sprite1, 1));
   else if (m1.name === 'BLOCK') lunges.push(blockFlash(sprite1));
@@ -1155,7 +1001,6 @@ async function animateMoves(p1, m1, p2, m2, dmg1, dmg2) {
   else if (m2.name === 'BLOCK') lunges.push(blockFlash(sprite2));
   else if (m2.name === 'HEAL') lunges.push(healGlow(sprite2));
   await Promise.all(lunges);
-
   const impactPromises = [];
   if (dmg1 > 0) {
     const center = getSpriteCenter(sprite2);
@@ -1171,9 +1016,7 @@ async function animateMoves(p1, m1, p2, m2, dmg1, dmg2) {
     impactPromises.push(recoilHit(sprite1, -1));
     impactPromises.push(flashHitCinematic('p1', '#e03c3c'));
   }
-  if (impactPromises.length) {
-    await Promise.all([hitFreeze(260), screenShake(10, 500), ...impactPromises]);
-  }
+  if (impactPromises.length) await Promise.all([hitFreeze(260), screenShake(10, 500), ...impactPromises]);
   await delay(200);
   [sprite1, sprite2].forEach(s => { s.style.filter = ''; s.style.transform = ''; s.style.transition = ''; });
 }
@@ -1243,36 +1086,21 @@ function logEntry(msg, cls = '') {
   els.battleLog.scrollTop = els.battleLog.scrollHeight;
 }
 
-function isGameOver() {
-  return state.p1.hp <= 0 || state.p2.hp <= 0;
-}
+function isGameOver() { return state.p1.hp <= 0 || state.p2.hp <= 0; }
 
 function endGame() {
   let winnerText, subText;
   const isAI = ['easy', 'medium', 'hard'].includes(gameMode);
   const isOnline = gameMode === 'online';
-
   if (state.p1.hp <= 0 && state.p2.hp <= 0) {
-    winnerText = 'DOUBLE K.O. — DRAW!';
-    subText = 'Both fighters fall...';
+    winnerText = 'DOUBLE K.O. — DRAW!'; subText = 'Both fighters fall...';
   } else if (state.p1.hp <= 0) {
-    if (isOnline) {
-      winnerText = onlineRole === 'p2' ? '🔥 YOU WIN!' : '💀 YOU LOSE!';
-      subText = onlineRole === 'p2' ? getVictoryFlair(state.p2.hp, state.p2.maxHp) : 'Better luck next time!';
-    } else {
-      winnerText = isAI ? `🤖 CPU WINS! (${gameMode.toUpperCase()})` : '🔥 PLAYER 2 WINS!';
-      subText = isAI ? getCpuVictoryTaunt(gameMode) : getVictoryFlair(state.p2.hp, state.p2.maxHp);
-    }
+    if (isOnline) { winnerText = onlineRole === 'p2' ? '🔥 YOU WIN!' : '💀 YOU LOSE!'; subText = onlineRole === 'p2' ? getVictoryFlair(state.p2.hp, state.p2.maxHp) : 'Better luck next time!'; }
+    else { winnerText = isAI ? `🤖 CPU WINS! (${gameMode.toUpperCase()})` : '🔥 PLAYER 2 WINS!'; subText = isAI ? getCpuVictoryTaunt(gameMode) : getVictoryFlair(state.p2.hp, state.p2.maxHp); }
   } else {
-    if (isOnline) {
-      winnerText = onlineRole === 'p1' ? '⚡ YOU WIN!' : '💀 YOU LOSE!';
-      subText = onlineRole === 'p1' ? getVictoryFlair(state.p1.hp, state.p1.maxHp) : 'Better luck next time!';
-    } else {
-      winnerText = '⚡ PLAYER 1 WINS!';
-      subText = isAI ? getPlayerVictoryTaunt(gameMode) : getVictoryFlair(state.p1.hp, state.p1.maxHp);
-    }
+    if (isOnline) { winnerText = onlineRole === 'p1' ? '⚡ YOU WIN!' : '💀 YOU LOSE!'; subText = onlineRole === 'p1' ? getVictoryFlair(state.p1.hp, state.p1.maxHp) : 'Better luck next time!'; }
+    else { winnerText = '⚡ PLAYER 1 WINS!'; subText = isAI ? getPlayerVictoryTaunt(gameMode) : getVictoryFlair(state.p1.hp, state.p1.maxHp); }
   }
-
   els.resultWinner.textContent = winnerText;
   els.resultSub.textContent = subText;
   showScreen('result');
@@ -1306,30 +1134,18 @@ function getPlayerVictoryTaunt(diff) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-// ===== UTILS =====
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
+function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-// Handle resize — update labels if needed
 let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => {
-    if (screens.game.classList.contains('active')) {
-      updateModeUI();
-    }
-  }, 200);
+  resizeTimer = setTimeout(() => { if (screens.game.classList.contains('active')) updateModeUI(); }, 200);
 });
 
-// Prevent double-tap zoom on iOS
 document.addEventListener('touchend', (e) => {
   const now = Date.now();
-  if (now - (document._lastTouch || 0) < 300) {
-    e.preventDefault();
-  }
+  if (now - (document._lastTouch || 0) < 300) e.preventDefault();
   document._lastTouch = now;
 }, { passive: false });
 
-// ===== INIT =====
 showScreen('title');
