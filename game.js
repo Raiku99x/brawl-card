@@ -2,15 +2,19 @@
 //   BRAWL CARDS — game.js
 //   • Local 2P, CPU modes (unchanged)
 //   • Online multiplayer via Supabase Realtime
+//   • Mobile-responsive fixes
 // ============================================
 
 // ─── SUPABASE CONFIG ───────────────────────
-// Replace these with your own project values from supabase.com
 const SUPABASE_URL = 'https://oikumdcokfhrzuvgmxku.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9pa3VtZGNva2Zocnp1dmdteGt1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4NzA2NTYsImV4cCI6MjA4ODQ0NjY1Nn0.X_PzXZswIFPKZddV24rcSql6PbVoR0vmuKdn3Xh_qAQ';
 // ───────────────────────────────────────────
 
-const supabaseClient = window.supabase.createClient(   SUPABASE_URL,   SUPABASE_ANON_KEY,   {     auth: {       persistSession: false,       autoRefreshToken: false     }   } );
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+  { auth: { persistSession: false, autoRefreshToken: false } }
+);
 
 // ===== MOVE DEFINITIONS =====
 const MOVES = {
@@ -25,11 +29,11 @@ const MOVES = {
 const MOVE_KEYS = Object.keys(MOVES);
 
 // ===== GAME CONFIG =====
-let gameMode = '2p'; // '2p' | 'easy' | 'medium' | 'hard' | 'online'
+let gameMode = '2p';
 
 // ===== ONLINE STATE =====
-let onlineRoom = null;   // current room code
-let onlineRole = null;   // 'p1' or 'p2'
+let onlineRoom = null;
+let onlineRole = null;
 let onlineChannel = null;
 let onlinePendingMoves = {};
 let onlineOpponentConnected = false;
@@ -54,35 +58,35 @@ const screens = {
 };
 
 const els = {
-  p1HpBar:    document.getElementById('p1-hp-bar'),
-  p2HpBar:    document.getElementById('p2-hp-bar'),
-  p1HpText:   document.getElementById('p1-hp-text'),
-  p2HpText:   document.getElementById('p2-hp-text'),
-  roundNum:   document.getElementById('round-num'),
-  p1Cards:    document.getElementById('p1-cards'),
-  p2Cards:    document.getElementById('p2-cards'),
-  p1SelDisp:  document.getElementById('p1-selected-display'),
-  p2SelDisp:  document.getElementById('p2-selected-display'),
-  p1Panel:    document.getElementById('p1-panel'),
-  p2Panel:    document.getElementById('p2-panel'),
-  p1Sprite:   document.getElementById('p1-sprite'),
-  p2Sprite:   document.getElementById('p2-sprite'),
-  phaseBanner:document.getElementById('phase-banner'),
-  battleLog:  document.getElementById('battle-log'),
-  btnResolve: document.getElementById('btn-resolve'),
+  p1HpBar:      document.getElementById('p1-hp-bar'),
+  p2HpBar:      document.getElementById('p2-hp-bar'),
+  p1HpText:     document.getElementById('p1-hp-text'),
+  p2HpText:     document.getElementById('p2-hp-text'),
+  roundNum:     document.getElementById('round-num'),
+  p1Cards:      document.getElementById('p1-cards'),
+  p2Cards:      document.getElementById('p2-cards'),
+  p1SelDisp:    document.getElementById('p1-selected-display'),
+  p2SelDisp:    document.getElementById('p2-selected-display'),
+  p1Panel:      document.getElementById('p1-panel'),
+  p2Panel:      document.getElementById('p2-panel'),
+  p1Sprite:     document.getElementById('p1-sprite'),
+  p2Sprite:     document.getElementById('p2-sprite'),
+  phaseBanner:  document.getElementById('phase-banner'),
+  battleLog:    document.getElementById('battle-log'),
+  btnResolve:   document.getElementById('btn-resolve'),
   resultWinner: document.getElementById('result-winner'),
   resultSub:    document.getElementById('result-sub'),
   hitOverlay:   document.getElementById('hit-overlay'),
   p1Name:       document.getElementById('p1-name'),
   p2Name:       document.getElementById('p2-name'),
+  p1PanelTitle: document.getElementById('p1-panel-title'),
   p2PanelTitle: document.getElementById('p2-panel-title'),
   modeBadge:    document.getElementById('mode-badge'),
   cpuThinking:  document.getElementById('cpu-thinking'),
-  onlineWaiting: document.getElementById('online-waiting'),
+  onlineWaiting:document.getElementById('online-waiting'),
   pokeDialog:   document.getElementById('poke-dialog'),
   pokeDialogText: document.getElementById('poke-dialog-text'),
-  pokeDialogArrow: document.getElementById('poke-dialog-arrow'),
-  // Online UI
+  pokeDialogArrow:document.getElementById('poke-dialog-arrow'),
   btnCreateRoom:  document.getElementById('btn-create-room'),
   btnJoinRoom:    document.getElementById('btn-join-room'),
   joinInputWrap:  document.getElementById('join-input-wrap'),
@@ -95,6 +99,10 @@ const els = {
 function showScreen(name) {
   Object.values(screens).forEach(s => s.classList.remove('active'));
   screens[name].classList.add('active');
+  // Scroll title screen to top on mobile after transitions
+  if (name === 'title') {
+    screens.title.scrollTop = 0;
+  }
 }
 
 // ===== TITLE SCREEN BUTTONS =====
@@ -120,7 +128,6 @@ document.getElementById('btn-title').addEventListener('click', () => {
 });
 document.getElementById('btn-rematch').addEventListener('click', () => {
   if (gameMode === 'online') {
-    // Signal rematch to opponent
     sendOnlineEvent('rematch', {});
     startGame();
     showScreen('game');
@@ -134,7 +141,10 @@ document.getElementById('btn-rematch').addEventListener('click', () => {
 els.btnCreateRoom.addEventListener('click', createOnlineRoom);
 els.btnJoinRoom.addEventListener('click', () => {
   els.joinInputWrap.classList.toggle('hidden');
-  els.joinCodeInput.focus();
+  if (!els.joinInputWrap.classList.contains('hidden')) {
+    // Small delay so keyboard doesn't fight the toggle animation
+    setTimeout(() => els.joinCodeInput.focus(), 100);
+  }
 });
 els.btnJoinConfirm.addEventListener('click', () => {
   const code = els.joinCodeInput.value.trim().toUpperCase();
@@ -145,8 +155,13 @@ els.btnJoinConfirm.addEventListener('click', () => {
   joinOnlineRoom(code);
 });
 els.joinCodeInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter') els.btnJoinConfirm.click();
-  els.joinCodeInput.value = els.joinCodeInput.value.toUpperCase();
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    els.btnJoinConfirm.click();
+  }
+});
+els.joinCodeInput.addEventListener('input', () => {
+  els.joinCodeInput.value = els.joinCodeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
 });
 
 function showRoomStatus(msg, type = 'waiting') {
@@ -156,9 +171,6 @@ function showRoomStatus(msg, type = 'waiting') {
 }
 
 // ===== CREATE ROOM =====
-// Pure Realtime broadcast — NO database table required.
-// P1 creates a channel and waits. P2 joins the same channel and sends 'ping'.
-// P1 replies 'pong' to confirm. Then both start the game.
 async function createOnlineRoom() {
   const code = generateRoomCode();
   onlineRoom = code;
@@ -174,10 +186,7 @@ async function joinOnlineRoom(code) {
   onlineRoom = code;
   onlineRole = 'p2';
   await subscribeToRoom(code);
-  // After channel is subscribed, ping P1 to confirm room exists
-  // Give the WebSocket a moment to connect before sending
   setTimeout(() => sendOnlineEvent('ping', { role: 'p2' }), 600);
-  // If no pong after 5 seconds, room doesn't exist / P1 is gone
   onlineJoinTimeout = setTimeout(() => {
     if (!onlineOpponentConnected) {
       showRoomStatus(`Room "${code}" not found or host left!`, 'error');
@@ -199,7 +208,6 @@ function subscribeToRoom(code) {
     });
 
     onlineChannel
-      // P1 receives ping from P2 → confirms room, sends pong, starts game
       .on('broadcast', { event: 'ping' }, () => {
         if (onlineRole !== 'p1') return;
         onlineOpponentConnected = true;
@@ -212,7 +220,6 @@ function subscribeToRoom(code) {
           showScreen('game');
         }, 600);
       })
-      // P2 receives pong from P1 → room confirmed, start game
       .on('broadcast', { event: 'pong' }, () => {
         if (onlineRole !== 'p2') return;
         onlineOpponentConnected = true;
@@ -248,17 +255,16 @@ function handleOnlineMove(role, moveKey) {
   onlinePendingMoves[role] = moveKey;
 
   if (role !== onlineRole) {
-    // Opponent locked in
     els.p2SelDisp.textContent = '✓ OPPONENT LOCKED IN';
     els.p2SelDisp.style.color = 'var(--online)';
   }
 
-  // If we have both moves, resolve
   if (onlinePendingMoves.p1 && onlinePendingMoves.p2) {
     state.p1.move = onlinePendingMoves.p1;
     state.p2.move = onlinePendingMoves.p2;
     onlinePendingMoves = {};
     els.onlineWaiting.classList.add('hidden');
+    showBothPanels(); // Reveal both picks during resolution
     state.phase = 'both-chosen';
     setTimeout(() => resolveRound(), 300);
   }
@@ -308,38 +314,48 @@ function updateModeUI() {
   const isAI = ['easy', 'medium', 'hard'].includes(gameMode);
   const isOnline = gameMode === 'online';
 
-  els.p1Name.textContent = isOnline ? `⚡ YOU (P1)` : 'PLAYER 1';
-  els.p1Name.className = 'fighter-name p1-color';
+  // Responsive label: use short labels on narrow screens
+  const isMobile = window.innerWidth < 400;
 
   if (isAI) {
-    const label = gameMode === 'easy' ? 'CPU — EASY' : gameMode === 'medium' ? 'CPU — MEDIUM' : 'CPU — HARD';
-    els.p2Name.textContent = label;
+    const label = gameMode === 'easy' ? 'CPU EASY' : gameMode === 'medium' ? 'CPU MEDIUM' : 'CPU HARD';
+    const shortLabel = gameMode === 'easy' ? 'CPU — EASY' : gameMode === 'medium' ? 'CPU — MED' : 'CPU — HARD';
+    els.p1Name.textContent = 'PLAYER 1';
+    els.p1Name.className = 'fighter-name p1-color';
+    els.p2Name.textContent = isMobile ? shortLabel : label;
     els.p2Name.className = 'fighter-name cpu-color';
-    els.p2PanelTitle.textContent = '🤖 CPU — LOCKED IN';
+    els.p2PanelTitle.textContent = isMobile ? '🤖 CPU' : '🤖 CPU — LOCKED IN';
     els.p2PanelTitle.style.color = 'var(--cpu)';
+    els.p1PanelTitle.textContent = isMobile ? '⚡ P1 — PICK' : '⚡ PLAYER 1 — CHOOSE';
+    els.p1PanelTitle.style.color = '';
     els.p2Sprite.classList.add('cpu-sprite');
     els.p2Sprite.classList.remove('online-sprite');
-    els.modeBadge.textContent = `VS CPU · ${gameMode.toUpperCase()}`;
+    els.modeBadge.textContent = isMobile ? `VS CPU·${gameMode.toUpperCase()}` : `VS CPU · ${gameMode.toUpperCase()}`;
     els.modeBadge.className = `mode-badge ${gameMode}`;
   } else if (isOnline) {
     const myRole = onlineRole || 'p1';
-    const oppLabel = myRole === 'p1' ? 'OPPONENT (P2)' : 'OPPONENT (P1)';
-    els.p1Name.textContent = myRole === 'p1' ? '⚡ YOU' : '⚡ OPPONENT';
-    els.p2Name.textContent = myRole === 'p2' ? '🔥 YOU' : oppLabel;
+    els.p1Name.textContent = myRole === 'p1' ? (isMobile ? '⚡ YOU' : '⚡ YOU (P1)') : '⚡ OPP';
+    els.p2Name.textContent = myRole === 'p2' ? (isMobile ? '🔥 YOU' : '🔥 YOU (P2)') : '🔥 OPP';
+    els.p1Name.className = 'fighter-name p1-color';
     els.p2Name.className = 'fighter-name online-color';
-    els.p2PanelTitle.textContent = `🌐 OPPONENT — CHOOSING`;
+    els.p2PanelTitle.textContent = isMobile ? '🌐 OPP' : '🌐 OPPONENT — CHOOSING';
     els.p2PanelTitle.style.color = 'var(--online)';
+    els.p1PanelTitle.textContent = isMobile ? '⚡ YOU' : '⚡ YOU — CHOOSE';
+    els.p1PanelTitle.style.color = '';
     els.p2Sprite.classList.remove('cpu-sprite');
     els.p2Sprite.classList.add('online-sprite');
-    els.modeBadge.textContent = `ONLINE · ROOM ${onlineRoom}`;
+    els.modeBadge.textContent = isMobile ? `RM:${onlineRoom}` : `ONLINE · ROOM ${onlineRoom}`;
     els.modeBadge.className = 'mode-badge online';
-    // In online mode only show the local player's panel
     applyOnlinePanelLayout();
   } else {
+    els.p1Name.textContent = 'PLAYER 1';
+    els.p1Name.className = 'fighter-name p1-color';
     els.p2Name.textContent = 'PLAYER 2';
     els.p2Name.className = 'fighter-name p2-color';
-    els.p2PanelTitle.textContent = '🔥 PLAYER 2 — CHOOSE';
+    els.p2PanelTitle.textContent = isMobile ? '🔥 P2 — PICK' : '🔥 PLAYER 2 — CHOOSE';
     els.p2PanelTitle.style.color = '';
+    els.p1PanelTitle.textContent = isMobile ? '⚡ P1 — PICK' : '⚡ PLAYER 1 — CHOOSE';
+    els.p1PanelTitle.style.color = '';
     els.p2Sprite.classList.remove('cpu-sprite', 'online-sprite');
     els.modeBadge.textContent = '2 PLAYER';
     els.modeBadge.className = 'mode-badge';
@@ -353,7 +369,6 @@ function applyOnlinePanelLayout() {
 
   myPanel.style.opacity = '1';
   oppPanel.style.opacity = '0.5';
-  // Blur/hide opponent's actual cards
   const oppCards = oppPanel.querySelectorAll('.card');
   oppCards.forEach(c => c.classList.add('online-hidden'));
 }
@@ -390,11 +405,13 @@ async function processDialogQueue() {
     els.pokeDialogArrow.classList.remove('hidden');
     const next = () => {
       els.pokeDialog.removeEventListener('click', next);
+      els.pokeDialog.removeEventListener('touchend', next);
       document.removeEventListener('keydown', next);
       resolve();
       processDialogQueue();
     };
     els.pokeDialog.addEventListener('click', next);
+    els.pokeDialog.addEventListener('touchend', next, { passive: true });
     document.addEventListener('keydown', next);
   }
 }
@@ -424,10 +441,10 @@ function buildCards(player) {
 
     let statLine = '';
     if (move.dmg && move.dmg !== 'x2') statLine += `<span class="stat-dmg">DMG:${move.dmg}</span> `;
-    if (move.dmg === 'x2') statLine += `<span class="stat-dmg">DMG:×2</span> `;
+    if (move.dmg === 'x2') statLine += `<span class="stat-dmg">×2</span> `;
     if (move.heal) statLine += `<span class="stat-heal">+${move.heal}HP</span> `;
     if (move.defence) statLine += `<span class="stat-def">DEF:${move.defence}</span> `;
-    statLine += `<span>PRI:${move.priority >= 0 ? '+' : ''}${move.priority}</span>`;
+    statLine += `<span>P:${move.priority >= 0 ? '+' : ''}${move.priority}</span>`;
 
     card.innerHTML = `
       <div class="card-emoji">${move.emoji}</div>
@@ -435,6 +452,11 @@ function buildCards(player) {
       <div class="card-stats">${statLine}</div>
     `;
     card.addEventListener('click', () => selectMove(player, key, card));
+    // Also support touch for faster response on mobile
+    card.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      selectMove(player, key, card);
+    }, { passive: false });
     container.appendChild(card);
   });
 }
@@ -446,32 +468,29 @@ function selectMove(player, moveKey, cardEl) {
     const myCards = onlineRole === 'p1' ? 'p1' : 'p2';
     if (player !== myCards) return;
     if (state.phase === 'resolve') return;
-    if (state[player].move !== null) return; // already chose
+    if (state[player].move !== null) return;
 
     const container = player === 'p1' ? els.p1Cards : els.p2Cards;
     const dispEl    = player === 'p1' ? els.p1SelDisp : els.p2SelDisp;
     container.querySelectorAll('.card').forEach(c => c.classList.remove(`selected-${player}`));
     cardEl.classList.add(`selected-${player}`);
     state[player].move = moveKey;
-    dispEl.textContent = `✓ ${MOVES[moveKey].name} — LOCKED`;
+    dispEl.textContent = `✓ ${MOVES[moveKey].name}`;
     dispEl.style.color = player === 'p1' ? 'var(--p1)' : 'var(--p2)';
     lockCards(player);
 
-    // Send to opponent
     sendOnlineEvent('move', { role: onlineRole, move: moveKey });
-    // Register our own move in pending
     onlinePendingMoves[onlineRole] = moveKey;
 
-    // Show waiting indicator
     els.onlineWaiting.classList.remove('hidden');
     els.phaseBanner.classList.add('hidden');
 
-    // Check if both moves already in (unlikely but possible if opponent was very fast)
     if (onlinePendingMoves.p1 && onlinePendingMoves.p2) {
       state.p1.move = onlinePendingMoves.p1;
       state.p2.move = onlinePendingMoves.p2;
       onlinePendingMoves = {};
       els.onlineWaiting.classList.add('hidden');
+      showBothPanels();
       state.phase = 'both-chosen';
       setTimeout(() => resolveRound(), 300);
     }
@@ -517,7 +536,7 @@ async function triggerCpuMove() {
   state.p2.move = chosenKey;
   state.p2LastMove = chosenKey;
 
-  els.p2SelDisp.textContent = `✓ MOVE LOCKED`;
+  els.p2SelDisp.textContent = `✓ LOCKED`;
   els.p2SelDisp.style.color = 'var(--cpu)';
 
   const p2Cards = els.p2Cards.querySelectorAll('.card');
@@ -579,8 +598,8 @@ function pickHardMove() {
 
   const recentLen = Math.min(history.length, 4);
   const recent = history.slice(-recentLen);
-  const blockCount  = recent.filter(m => m === 'BLOCK').length;
-  const lastMove    = history[history.length - 1];
+  const blockCount = recent.filter(m => m === 'BLOCK').length;
+  const lastMove = history[history.length - 1];
   const quickAtkCount = recent.filter(m => m === 'QUICK_ATK').length;
   const lastIsQuick = lastMove === 'QUICK_ATK';
   const nonQuickAttacks = recent.filter(m => ['ATK','HEAVY_ATK'].includes(m)).length;
@@ -629,6 +648,23 @@ function unlockCards(player) {
   dispEl.style.color = '';
 }
 
+// ===== SINGLE PANEL DISPLAY =====
+function showActivePanel(player) {
+  const selArea = document.getElementById('selection-area');
+  selArea.classList.add('single-panel');
+  els.p1Panel.classList.remove('panel-active');
+  els.p2Panel.classList.remove('panel-active');
+  if (player === 'p1') els.p1Panel.classList.add('panel-active');
+  else els.p2Panel.classList.add('panel-active');
+}
+
+function showBothPanels() {
+  const selArea = document.getElementById('selection-area');
+  selArea.classList.remove('single-panel');
+  els.p1Panel.classList.remove('panel-active');
+  els.p2Panel.classList.remove('panel-active');
+}
+
 // ===== SET PHASE =====
 function setPhase(phase) {
   state.phase = phase;
@@ -637,6 +673,8 @@ function setPhase(phase) {
   els.btnResolve.classList.add('hidden');
   els.cpuThinking.classList.add('hidden');
   els.onlineWaiting.classList.add('hidden');
+
+  const isMobile = window.innerWidth < 400;
 
   if (phase === 'p1-choose') {
     hideDialog();
@@ -647,41 +685,51 @@ function setPhase(phase) {
       state.p1.move = null;
       state.p2.move = null;
 
-      // Show the correct banner based on role
-      banner.textContent = '⚡ PICK YOUR MOVE — OPPONENT PICKS SECRETLY';
+      banner.textContent = isMobile ? '⚡ PICK SECRETLY' : '⚡ PICK YOUR MOVE — OPPONENT PICKS SECRETLY';
       banner.classList.add('online-wait');
 
-      // Re-apply online panel layout
-      applyOnlinePanelLayout();
-      // Only the local player's cards are clickable
+      // Only show your panel, hide opponent's entirely
+      const myPanel = onlineRole === 'p1' ? 'p1' : 'p2';
+      showActivePanel(myPanel);
+
+      // Disable opponent's cards (hidden anyway but keep consistent)
       const oppCards = onlineRole === 'p1' ? els.p2Cards : els.p1Cards;
       oppCards.querySelectorAll('.card').forEach(c => {
         c.classList.add('disabled', 'online-hidden');
       });
+
       if (onlineRole === 'p2') {
-        // P2's display is labelled differently
-        els.p2PanelTitle.textContent = '🔥 YOU — CHOOSE';
+        els.p2PanelTitle.textContent = isMobile ? '🔥 YOU' : '🔥 YOU — CHOOSE';
         els.p2PanelTitle.style.color = 'var(--p2)';
-        els.p1PanelTitle && (els.p1PanelTitle.textContent = '⚡ OPPONENT — CHOOSING');
+      } else {
+        els.p1PanelTitle.textContent = isMobile ? '⚡ YOU' : '⚡ YOU — CHOOSE';
+        els.p1PanelTitle.style.color = 'var(--p1)';
       }
     } else {
-      banner.textContent = '⚡ PLAYER 1 — CHOOSE YOUR MOVE';
+      banner.textContent = isMobile ? '⚡ P1 — CHOOSE' : '⚡ PLAYER 1 — CHOOSE YOUR MOVE';
       unlockCards('p1');
       unlockCards('p2');
       state.p1.move = null;
       state.p2.move = null;
       els.p2Cards.querySelectorAll('.card').forEach(c => c.classList.add('disabled'));
-      if (gameMode !== '2p') els.p2SelDisp.textContent = '— CPU WILL CHOOSE —';
+      if (gameMode !== '2p') {
+        els.p2SelDisp.textContent = '— CPU WILL CHOOSE —';
+        showActivePanel('p1'); // AI: only show player's panel
+      } else {
+        showActivePanel('p1'); // 2P local: show p1 first
+      }
     }
 
   } else if (phase === 'p2-choose') {
-    banner.textContent = '🔥 PLAYER 2 — CHOOSE YOUR MOVE';
+    banner.textContent = isMobile ? '🔥 P2 — CHOOSE' : '🔥 PLAYER 2 — CHOOSE YOUR MOVE';
     banner.classList.add('p2-turn');
     els.p2Cards.querySelectorAll('.card').forEach(c => c.classList.remove('disabled'));
+    showActivePanel('p2'); // 2P local: now show p2 panel
 
   } else if (phase === 'both-chosen') {
     banner.classList.add('hidden');
     if (gameMode === '2p') {
+      showBothPanels(); // Show both for resolve button in 2P
       els.btnResolve.classList.remove('hidden');
     }
   }
@@ -702,10 +750,8 @@ async function resolveRound() {
   logEntry(`— ROUND ${state.round} —`, 'log-info');
   logEntry(`P1: ${m1.name}  |  ${p2Label}: ${m2.name}`, 'log-info');
 
-  // Reveal moves in online mode
   if (gameMode === 'online') {
     els.p2SelDisp.textContent = `✓ ${m2.name}`;
-    // Reveal opponent cards briefly
     const oppCards = onlineRole === 'p1' ? els.p2Cards : els.p1Cards;
     oppCards.querySelectorAll('.card').forEach(c => {
       c.classList.remove('online-hidden');
@@ -783,11 +829,11 @@ async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = fa
     const isDefenderAttacking = ['ATK', 'HEAVY ATK'].includes(defMove.name);
     const isQuickAtk = defMove.name === 'QUICK ATK';
     if (isQuickAtk) {
-      await showDialog(`${attackerLabel}'s COUNTER failed!\n${defenderLabel}'s QUICK ATK was too fast to reflect!`, 2000);
+      await showDialog(`${attackerLabel}'s COUNTER failed!\n${defenderLabel}'s QUICK ATK was too fast!`, 2000);
     } else if (!isDefenderAttacking) {
-      await showDialog(`${attackerLabel}'s COUNTER failed!\nThere was no attack to reflect — turn wasted!`, 2000);
+      await showDialog(`${attackerLabel}'s COUNTER failed!\nNo attack to reflect — turn wasted!`, 2000);
     } else {
-      await showDialog(`${attackerLabel}'s COUNTER activated!\nReflecting ${actualDmg} damage back at ${defenderLabel}!`, 2000);
+      await showDialog(`${attackerLabel}'s COUNTER activated!\nReflecting ${actualDmg} damage back!`, 2000);
     }
   } else {
     if (actualDmg > 0) {
@@ -856,8 +902,10 @@ function initParticleCanvas() {
   particleCanvas.height = window.innerHeight;
   particleCtx = particleCanvas.getContext('2d');
   window.addEventListener('resize', () => {
-    particleCanvas.width = window.innerWidth;
-    particleCanvas.height = window.innerHeight;
+    if (particleCanvas) {
+      particleCanvas.width = window.innerWidth;
+      particleCanvas.height = window.innerHeight;
+    }
   });
 }
 
@@ -888,7 +936,7 @@ function spawnImpactParticles(x, y, color, count = 18) {
 function animateParticles(particles) {
   let alive = true;
   function frame() {
-    if (!alive) return;
+    if (!alive || !particleCtx) return;
     particleCtx.fillStyle = 'rgba(0,0,0,0.25)';
     particleCtx.fillRect(0, 0, particleCanvas.width, particleCanvas.height);
     alive = false;
@@ -953,9 +1001,9 @@ function lungePunch(spriteEl, direction = 1) {
   return new Promise(resolve => {
     const isP2 = spriteEl.classList.contains('p2-sprite');
     const baseFlip = isP2 ? 'scaleX(-1)' : '';
-    const dist = direction * 65;
+    const dist = direction * 55;
     spriteEl.style.transition = 'transform 180ms cubic-bezier(0.2,1.4,0.4,1)';
-    spriteEl.style.transform = `${baseFlip} translateX(${dist}px) scale(1.18)`;
+    spriteEl.style.transform = `${baseFlip} translateX(${dist}px) scale(1.15)`;
     setTimeout(() => {
       spriteEl.style.transition = 'transform 340ms ease';
       spriteEl.style.transform = baseFlip ? baseFlip : '';
@@ -968,7 +1016,7 @@ function recoilHit(spriteEl, direction = -1) {
   return new Promise(resolve => {
     const isP2 = spriteEl.classList.contains('p2-sprite');
     const baseFlip = isP2 ? 'scaleX(-1)' : '';
-    const dist = direction * 50;
+    const dist = direction * 45;
     spriteEl.style.transition = 'transform 100ms ease';
     spriteEl.style.transform = `${baseFlip} translateX(${dist}px) scale(0.9)`;
     setTimeout(() => {
@@ -984,7 +1032,7 @@ function spriteFlash(spriteEl, color = '#fff', times = 3) {
     let count = 0;
     const interval = setInterval(() => {
       spriteEl.style.filter = count % 2 === 0
-        ? `brightness(4) drop-shadow(0 0 18px ${color})`
+        ? `brightness(4) drop-shadow(0 0 14px ${color})`
         : `brightness(1) drop-shadow(0 0 4px ${color})`;
       count++;
       if (count >= times * 2) { clearInterval(interval); spriteEl.style.filter = ''; resolve(); }
@@ -995,7 +1043,7 @@ function spriteFlash(spriteEl, color = '#fff', times = 3) {
 function healGlow(spriteEl) {
   return new Promise(resolve => {
     spriteEl.style.transition = 'filter 300ms ease, transform 300ms ease';
-    spriteEl.style.filter = 'brightness(2.5) drop-shadow(0 0 30px #2ecc71) hue-rotate(100deg)';
+    spriteEl.style.filter = 'brightness(2.5) drop-shadow(0 0 24px #2ecc71) hue-rotate(100deg)';
     spriteEl.style.transform = spriteEl.classList.contains('p2-sprite') ? 'scaleX(-1) scale(1.3)' : 'scale(1.3)';
     const center = getSpriteCenter(spriteEl);
     spawnHealParticles(center.x, center.y);
@@ -1013,7 +1061,7 @@ function healGlow(spriteEl) {
 function spawnHealParticles(x, y) {
   if (!particleCtx) return;
   const particles = [];
-  for (let i = 0; i < 28; i++) {
+  for (let i = 0; i < 24; i++) {
     particles.push({
       x: x + (Math.random() - 0.5) * 50, y: y + Math.random() * 20,
       vx: (Math.random() - 0.5) * 2.5, vy: -(2.5 + Math.random() * 5),
@@ -1029,7 +1077,7 @@ function blockFlash(spriteEl) {
     const isP2 = spriteEl.classList.contains('p2-sprite');
     const baseFlip = isP2 ? 'scaleX(-1)' : '';
     spriteEl.style.transition = 'filter 150ms, transform 150ms';
-    spriteEl.style.filter = 'brightness(2.5) drop-shadow(0 0 24px #4af0c8)';
+    spriteEl.style.filter = 'brightness(2.5) drop-shadow(0 0 20px #4af0c8)';
     spriteEl.style.transform = `${baseFlip} scale(0.88) translateX(${isP2 ? '-' : ''}8px)`;
     setTimeout(() => {
       spriteEl.style.transition = 'filter 400ms, transform 400ms';
@@ -1063,7 +1111,7 @@ async function animateSingleTurn(attacker, atkMove, defender, defMove, dmg) {
       const center = getSpriteCenter(defSprite);
       spawnImpactParticles(center.x, center.y, '#b04aff', 36);
       await Promise.all([
-        hitFreeze(400), screenShake(18, 700),
+        hitFreeze(400), screenShake(16, 700),
         spriteFlash(defSprite, '#ff4444', 6),
         recoilHit(defSprite, atkDir * -1),
         flashHitCinematic(defender, '#b04aff'),
@@ -1081,13 +1129,13 @@ async function animateSingleTurn(attacker, atkMove, defender, defMove, dmg) {
     if (dmg > 0) {
       const center = getSpriteCenter(defSprite);
       const impactColor = attacker === 'p1' ? '#f7c948' : '#e03c3c';
-      const particleCount = isHeavy ? 40 : isQuick ? 18 : 24;
+      const particleCount = isHeavy ? 36 : isQuick ? 16 : 22;
       spawnImpactParticles(center.x, center.y, impactColor, particleCount);
-      if (isHeavy) setTimeout(() => spawnImpactParticles(center.x, center.y, '#ff8800', 20), 120);
+      if (isHeavy) setTimeout(() => spawnImpactParticles(center.x, center.y, '#ff8800', 18), 120);
       const freezeDur = isHeavy ? 400 : isQuick ? 150 : 250;
-      const shakeMag  = isHeavy ? 20  : isQuick ? 8   : 12;
+      const shakeMag  = isHeavy ? 18  : isQuick ? 7   : 10;
       const shakeDur  = isHeavy ? 700 : isQuick ? 350 : 500;
-      const flashTimes = isHeavy ? 7  : isQuick ? 3   : 4;
+      const flashTimes = isHeavy ? 6  : isQuick ? 3   : 4;
       await Promise.all([
         hitFreeze(freezeDur), screenShake(shakeMag, shakeDur),
         spriteFlash(defSprite, impactColor, flashTimes),
@@ -1117,20 +1165,20 @@ async function animateMoves(p1, m1, p2, m2, dmg1, dmg2) {
   const impactPromises = [];
   if (dmg1 > 0) {
     const center = getSpriteCenter(sprite2);
-    spawnImpactParticles(center.x, center.y, '#f7c948', 24);
+    spawnImpactParticles(center.x, center.y, '#f7c948', 22);
     impactPromises.push(spriteFlash(sprite2, '#f7c948', 4));
     impactPromises.push(recoilHit(sprite2, 1));
     impactPromises.push(flashHitCinematic('p2', '#f7c948'));
   }
   if (dmg2 > 0) {
     const center = getSpriteCenter(sprite1);
-    spawnImpactParticles(center.x, center.y, '#e03c3c', 24);
+    spawnImpactParticles(center.x, center.y, '#e03c3c', 22);
     impactPromises.push(spriteFlash(sprite1, '#e03c3c', 4));
     impactPromises.push(recoilHit(sprite1, -1));
     impactPromises.push(flashHitCinematic('p1', '#e03c3c'));
   }
   if (impactPromises.length) {
-    await Promise.all([hitFreeze(260), screenShake(12, 500), ...impactPromises]);
+    await Promise.all([hitFreeze(260), screenShake(10, 500), ...impactPromises]);
   }
   await delay(200);
   [sprite1, sprite2].forEach(s => { s.style.filter = ''; s.style.transform = ''; s.style.transition = ''; });
@@ -1157,14 +1205,15 @@ function spawnDamageNumber(target, amount, type = 'dmg') {
   const el = document.createElement('div');
   const colors = { dmg: '#ff4444', heal: '#2ecc71', counter: '#b04aff' };
   const symbols = { dmg: `-${amount}`, heal: `+${amount}`, counter: `×${amount}` };
+  const isMobile = window.innerWidth < 480;
   el.style.cssText = `
     position:fixed;
     left:${rect.left + rect.width / 2}px;
     top:${rect.top}px;
     font-family:var(--font-title);
-    font-size:${type === 'counter' ? '2.2rem' : amount >= 2 ? '2rem' : '1.6rem'};
+    font-size:${isMobile ? '1.4rem' : (type === 'counter' ? '2.2rem' : amount >= 2 ? '2rem' : '1.6rem')};
     color:${colors[type] || colors.dmg};
-    text-shadow: 2px 2px 0 #000, 0 0 20px ${colors[type] || colors.dmg};
+    text-shadow: 2px 2px 0 #000, 0 0 16px ${colors[type] || colors.dmg};
     pointer-events:none;
     z-index:1000;
     transform:translate(-50%,-50%);
@@ -1189,7 +1238,7 @@ function updatePlayerHUD(player) {
   bar.classList.remove('low', 'mid');
   if (pct <= 25) bar.classList.add('low');
   else if (pct <= 60) bar.classList.add('mid');
-  txt.textContent = `${p.hp} / ${p.maxHp}`;
+  txt.textContent = `${p.hp}/${p.maxHp}`;
 }
 
 function logEntry(msg, cls = '') {
@@ -1267,6 +1316,26 @@ function getPlayerVictoryTaunt(diff) {
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+// Handle resize — update labels if needed
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (screens.game.classList.contains('active')) {
+      updateModeUI();
+    }
+  }, 200);
+});
+
+// Prevent double-tap zoom on iOS
+document.addEventListener('touchend', (e) => {
+  const now = Date.now();
+  if (now - (document._lastTouch || 0) < 300) {
+    e.preventDefault();
+  }
+  document._lastTouch = now;
+}, { passive: false });
 
 // ===== INIT =====
 showScreen('title');
