@@ -994,7 +994,7 @@ function setPhase(phase) {
       state.p1.move = null; state.p2.move = null;
       banner.textContent = isMobile ? '⚡ PICK SECRETLY' : '⚡ PICK YOUR MOVE — OPPONENT PICKS SECRETLY';
       banner.classList.add('online-wait');
-      if (timerState.suddenDeath) { banner.textContent = '⚡ NO GUARD BRAWL — LOW HP AFTER TURN = DEATH'; banner.classList.add('sd-phase'); }
+      if (timerState.suddenDeath) { banner.textContent = '⚡ NO GUARD BRAWL — LOWER HP AFTER TURN WILL BE DEAD'; banner.classList.add('sd-phase'); }
       const myPanel = onlineRole === 'p1' ? 'p1' : 'p2';
       showActivePanel(myPanel);
       const oppCards = onlineRole === 'p1' ? els.p2Cards : els.p1Cards;
