@@ -1390,22 +1390,16 @@ body {
 /* Green — high accuracy (80-100%) */
 .stat-acc.acc-high {
   color: #2ecc71;
-  background: rgba(46, 204, 113, 0.12);
-  border: 1px solid rgba(46, 204, 113, 0.25);
 }
  
 /* Yellow — medium accuracy (40-79%) */
 .stat-acc.acc-mid {
   color: #f7c948;
-  background: rgba(247, 201, 72, 0.12);
-  border: 1px solid rgba(247, 201, 72, 0.25);
 }
  
 /* Red — low accuracy (1-39%) */
 .stat-acc.acc-low {
   color: #e03c3c;
-  background: rgba(224, 60, 60, 0.12);
-  border: 1px solid rgba(224, 60, 60, 0.25);
   animation: accWarn 0.8s ease-in-out infinite alternate;
 }
  
