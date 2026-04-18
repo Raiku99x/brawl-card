@@ -534,8 +534,8 @@ const p1hp = state.p1.hp;
   const p2hp = state.p2.hp;
   if (p1hp > p2hp) {
     els.sdOverlay.querySelector('.sd-skull').textContent = '⚡';
-    els.sdOverlay.querySelector('.sd-title').textContent = 'P1 LEADS!';
-    els.sdOverlay.querySelector('.sd-sub').textContent = `P1 HP: ${p1hp}  >  P2 HP: ${p2hp}\nPlayer 1 is finishing Player 2!\nAnother round continues...`;
+els.sdOverlay.querySelector('.sd-title').textContent = 'P1 WINS!';
+    els.sdOverlay.querySelector('.sd-sub').textContent = `P1 HP: ${p1hp}  >  P2 HP: ${p2hp}\nPlayer 1 defeats Player 2!`;
   } else if (p2hp > p1hp) {
     els.sdOverlay.querySelector('.sd-skull').textContent = '🔥';
     els.sdOverlay.querySelector('.sd-title').textContent = 'P2 LEADS!';
