@@ -969,7 +969,7 @@ function setPhase(phase) {
       else showActivePanel('p1');
     }
     // Start the move timer for p1 (or the online player)
-    if (gameMode !== 'online') startMoveTimer('p1');
+    startMoveTimer(gameMode === 'online' ? onlineRole : 'p1');
 
   } else if (phase === 'p2-choose') {
     if (timerState.suddenDeath) {
