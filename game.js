@@ -268,7 +268,7 @@ function subscribeToRoom(code) {
         startGame();
         showScreen('game');
       })
-      .on('broadcast', { event: 'move' }, ({ payload }) => { handleOnlineMove(payload.role, payload.move); })
+      .on('broadcast', { event: 'move' }, ({ payload }) => { handleOnlineMove(payload.role, payload.move, payload.hitRoll); })
       .on('broadcast', { event: 'rematch' }, () => { startGame(); showScreen('game'); })
       .subscribe((status) => { if (status === 'SUBSCRIBED') resolve(); });
   });
@@ -279,15 +279,20 @@ function sendOnlineEvent(event, payload) {
   onlineChannel.send({ type: 'broadcast', event, payload });
 }
 
-function handleOnlineMove(role, moveKey) {
-  onlinePendingMoves[role] = moveKey;
+function handleOnlineMove(role, moveKey, hitRoll) {
+  onlinePendingMoves[role] = { move: moveKey, hitRoll };
   if (role !== onlineRole) {
     els.p2SelDisp.textContent = '✓ OPPONENT LOCKED IN';
     els.p2SelDisp.style.color = 'var(--online)';
   }
   if (onlinePendingMoves.p1 && onlinePendingMoves.p2) {
-    state.p1.move = onlinePendingMoves.p1;
-    state.p2.move = onlinePendingMoves.p2;
+    state.p1.move = onlinePendingMoves.p1.move;
+    state.p2.move = onlinePendingMoves.p2.move;
+    // Store pre-rolled hit results so both devices use identical values
+    state._onlineHitRolls = {
+      p1: onlinePendingMoves.p1.hitRoll,
+      p2: onlinePendingMoves.p2.hitRoll,
+    };
     onlinePendingMoves = {};
     els.onlineWaiting.classList.add('hidden');
     showBothPanels();
@@ -509,12 +514,15 @@ function selectMove(player, moveKey, cardEl) {
     dispEl.textContent = `✓ ${MOVES[moveKey].name}`;
     dispEl.style.color = player === 'p1' ? 'var(--p1)' : 'var(--p2)';
     lockCards(player);
-    sendOnlineEvent('move', { role: onlineRole, move: moveKey });
-    onlinePendingMoves[onlineRole] = moveKey;
+    const myHitRoll = rollAccuracy(player, moveKey);
+    sendOnlineEvent('move', { role: onlineRole, move: moveKey, hitRoll: myHitRoll });
+    onlinePendingMoves[onlineRole] = { move: moveKey, hitRoll: myHitRoll };
     els.onlineWaiting.classList.remove('hidden');
     els.phaseBanner.classList.add('hidden');
     if (onlinePendingMoves.p1 && onlinePendingMoves.p2) {
-      state.p1.move = onlinePendingMoves.p1; state.p2.move = onlinePendingMoves.p2;
+      state.p1.move = onlinePendingMoves.p1.move;
+      state.p2.move = onlinePendingMoves.p2.move;
+      state._onlineHitRolls = { p1: onlinePendingMoves.p1.hitRoll, p2: onlinePendingMoves.p2.hitRoll };
       onlinePendingMoves = {};
       els.onlineWaiting.classList.add('hidden');
       showBothPanels(); state.phase = 'both-chosen';
@@ -707,8 +715,14 @@ async function resolveRound() {
   logEntry(`— ROUND ${state.round} —`, 'log-info');
   logEntry(`P1: ${m1.name}  |  ${p2Label}: ${m2.name}`, 'log-info');
 
-  const p1Hit = rollAccuracy('p1', state.p1.move);
-  const p2Hit = rollAccuracy('p2', state.p2.move);
+  // Online: use pre-rolled values sent with each player's move so both devices are in sync
+  const p1Hit = (gameMode === 'online' && state._onlineHitRolls)
+    ? state._onlineHitRolls.p1
+    : rollAccuracy('p1', state.p1.move);
+  const p2Hit = (gameMode === 'online' && state._onlineHitRolls)
+    ? state._onlineHitRolls.p2
+    : rollAccuracy('p2', state.p2.move);
+  state._onlineHitRolls = null;
   roundHitResult.p1 = p1Hit;
   roundHitResult.p2 = p2Hit;
 
