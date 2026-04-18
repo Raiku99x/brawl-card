@@ -72,7 +72,7 @@ function getAccPct(player, moveKey) {
 const TIMER_CONFIG = {
   MOVE_TIME:  15,   // seconds per turn
   BANK_TIME:  180,  // 3 minutes per player
-  MATCH_TIME: 360,  // 6 minutes total
+  MATCH_TIME: 240,  // 6 minutes total
 };
 
 // Sudden death moves — Block and Heal are locked out
