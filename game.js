@@ -361,7 +361,6 @@ function resetTimers() {
   updateTimerHUD();
   if (timerState._matchTimer) clearInterval(timerState._matchTimer);
   timerState._matchTimer = setInterval(() => {
-    timerState.matchLeft = Math.max(0, timerState.matchLeft - 0.1);
     if (els.matchClock) {
       els.matchClock.textContent = fmtTime(timerState.matchLeft);
       const mpct = timerState.matchLeft / TIMER_CONFIG.MATCH_TIME;
