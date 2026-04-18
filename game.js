@@ -564,7 +564,7 @@ function hideTiedOverlay() {
   setTimeout(() => {
     els.sdOverlay.classList.add('hidden');
     els.sdOverlay.querySelector('.sd-skull').textContent = '💀';
-    els.sdOverlay.querySelector('.sd-title').textContent = 'SUDDEN DEATH';
+    els.sdOverlay.querySelector('.sd-title').textContent = 'NO GUARD BRAWL';
     els.sdOverlay.querySelector('.sd-sub').textContent = 'Time is up. One final round.\nHighest HP after resolve wins.';
     els.sdOverlay.querySelector('.sd-rule-row').style.display = '';
     els.sdOverlay.querySelector('.sd-quick-note').style.display = '';
