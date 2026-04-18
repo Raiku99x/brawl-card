@@ -998,6 +998,7 @@ els.btnResolve.addEventListener('click', resolveRound);
 async function resolveRound() {
   if (state.phase !== 'both-chosen') return;
   state.phase = 'resolve';
+  if (gameMode !== 'online') stopMoveTimer();
   els.btnResolve.classList.add('hidden');
 
   const m1 = MOVES[state.p1.move];
