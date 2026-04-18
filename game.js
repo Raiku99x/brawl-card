@@ -4,10 +4,15 @@
 //   • Online multiplayer via Supabase Realtime
 //   • Mobile-responsive fixes
 //   • Card sprite support (p1.png / p2.png)
-//   • ACCURACY SYSTEM ADDED
+//   • ACCURACY SYSTEM
 //     ATK=100%, QUICK ATK=120%, HEAVY ATK=80%
 //     BLOCK degrades: 100/80/50/10/1% per streak
 //     COUNTER & HEAL = always 100%
+//   FIXES:
+//     - Block fail shows "BLOCK FAILED" + full damage taken (no defence)
+//     - Quick ATK displays ACC:120% (raw, uncapped)
+//     - Counter floating number shows -N (e.g. -4) not ×N
+//     - ACC merged inline with stats line on cards
 // ============================================
 
 // ─── SUPABASE CONFIG ───────────────────────
@@ -23,44 +28,47 @@ const supabaseClient = window.supabase.createClient(
 
 // ===== MOVE DEFINITIONS =====
 const MOVES = {
-  ATK:       { name: 'ATK',       dmg: 2,    priority: 0,  heal: 0, defence: 0, label: 'DMG:2 | PRI:0',   emoji: '👊', desc: 'A solid straight punch! Deals 2 damage!' },
-  QUICK_ATK: { name: 'QUICK ATK', dmg: 1,    priority: 1,  heal: 0, defence: 0, label: 'DMG:1 | PRI:+1',  emoji: '⚡', desc: 'Lightning-fast jab! Goes first — and CANNOT be countered!' },
-  HEAVY_ATK: { name: 'HEAVY ATK', dmg: 4,    priority: -1, heal: 0, defence: 0, label: 'DMG:4 | PRI:-1',  emoji: '💥', desc: 'A bone-crushing blow! Deals 4 damage but goes last!' },
-  BLOCK:     { name: 'BLOCK',     dmg: 0,    priority: 2,  heal: 0, defence: 2, label: 'DEF:2 | PRI:+2',  emoji: '🛡️', desc: 'Raises guard! Reduces incoming damage by 2! Accuracy drops with repeated use.' },
-  COUNTER:   { name: 'COUNTER',   dmg: 'x2', priority: -2, heal: 0, defence: 0, label: 'DMG:×2 | PRI:-2', emoji: '🔄', desc: 'Reflects enemy attack back DOUBLED! Fails vs Quick ATK!' },
-  HEAL:      { name: 'HEAL',      dmg: 0,    priority: 2,  heal: 6, defence: 0, label: '+6HP | PRI:+2',   emoji: '💚', desc: 'Recovers 6 HP! But max HP drops by 2...' },
+  ATK:       { name: 'ATK',       dmg: 2,    priority: 0,  heal: 0, defence: 0, emoji: '👊' },
+  QUICK_ATK: { name: 'QUICK ATK', dmg: 1,    priority: 1,  heal: 0, defence: 0, emoji: '⚡' },
+  HEAVY_ATK: { name: 'HEAVY ATK', dmg: 4,    priority: -1, heal: 0, defence: 0, emoji: '💥' },
+  BLOCK:     { name: 'BLOCK',     dmg: 0,    priority: 2,  heal: 0, defence: 2, emoji: '🛡️' },
+  COUNTER:   { name: 'COUNTER',   dmg: 'x2', priority: -2, heal: 0, defence: 0, emoji: '🔄' },
+  HEAL:      { name: 'HEAL',      dmg: 0,    priority: 2,  heal: 6, defence: 0, emoji: '💚' },
 };
 
 const MOVE_KEYS = Object.keys(MOVES);
 
 // ===== ACCURACY SYSTEM =====
-// Base accuracy per move. QUICK_ATK > 1.0 so it always hits (capped at 100%)
+// Raw accuracy values — QUICK_ATK is 1.20 (120%) so future debuffs can reduce it.
+// Anything >= 1.0 always hits in rollAccuracy(), but we display the raw % on cards.
 const MOVE_ACCURACY = {
   ATK:       1.00,
-  QUICK_ATK: 1.20,
+  QUICK_ATK: 1.20,   // displays as 120%; still always hits until debuffed below 100%
   HEAVY_ATK: 0.80,
-  BLOCK:     1.00, // overridden by streak logic below
+  BLOCK:     1.00,   // overridden by streak logic
   COUNTER:   1.00,
   HEAL:      1.00,
 };
 
-// Block acc per consecutive-block streak (0-indexed: 0=1st use, 1=2nd use, etc.)
+// Block accuracy per consecutive-block streak (0-indexed)
 const BLOCK_ACC_STEPS = [1.00, 0.80, 0.50, 0.10, 0.01];
 
 function getBlockAccuracy(streak) {
-  const idx = Math.min(streak, BLOCK_ACC_STEPS.length - 1);
-  return BLOCK_ACC_STEPS[idx];
+  return BLOCK_ACC_STEPS[Math.min(streak, BLOCK_ACC_STEPS.length - 1)];
 }
 
 function getMoveAccuracy(player, moveKey) {
   if (moveKey === 'BLOCK') return getBlockAccuracy(state[player].blockStreak);
-  return Math.min(1.0, MOVE_ACCURACY[moveKey] || 1.0);
+  return MOVE_ACCURACY[moveKey] || 1.0;
 }
 
+// Hit roll: values >= 1.0 always hit; below 1.0 are probabilistic
 function rollAccuracy(player, moveKey) {
-  return Math.random() < getMoveAccuracy(player, moveKey);
+  const acc = getMoveAccuracy(player, moveKey);
+  return acc >= 1.0 ? true : Math.random() < acc;
 }
 
+// Display the raw percentage (can be > 100%)
 function getAccPct(player, moveKey) {
   return Math.round(getMoveAccuracy(player, moveKey) * 100);
 }
@@ -85,6 +93,9 @@ let state = {
   p1MoveHistory: [],
   p2LastMove: null,
 };
+
+// Track per-round block hit results for sequential turn defence calculation
+let roundBlockHit = { p1: null, p2: null };
 
 // ===== DOM REFS =====
 const screens = {
@@ -276,6 +287,7 @@ function startGame() {
     p1MoveHistory: [],
     p2LastMove: null,
   };
+  roundBlockHit = { p1: null, p2: null };
   onlinePendingMoves = {};
   els.battleLog.innerHTML = '';
   buildCards('p1');
@@ -395,20 +407,9 @@ function buildCards(player) {
     card.dataset.move = key;
     card.dataset.player = player;
 
-    let statLine = '';
-    if (move.dmg && move.dmg !== 'x2') statLine += `<span class="stat-dmg">DMG:${move.dmg}</span> `;
-    if (move.dmg === 'x2') statLine += `<span class="stat-dmg">×2</span> `;
-    if (move.heal) statLine += `<span class="stat-heal">+${move.heal}HP</span> `;
-    if (move.defence) statLine += `<span class="stat-def">DEF:${move.defence}</span> `;
-    statLine += `<span>P:${move.priority >= 0 ? '+' : ''}${move.priority}</span>`;
-
-    // Accuracy indicator
-    const accLine = buildAccLine(player, key);
-
     card.innerHTML = `
       <div class="card-name">${move.name}</div>
-      <div class="card-stats">${statLine}</div>
-      <div class="card-acc-line">${accLine}</div>
+      <div class="card-stats">${buildStatLine(player, key)}</div>
     `;
     card.addEventListener('click', () => selectMove(player, key, card));
     card.addEventListener('touchend', (e) => { e.preventDefault(); selectMove(player, key, card); }, { passive: false });
@@ -416,27 +417,46 @@ function buildCards(player) {
   });
 }
 
-function buildAccLine(player, key) {
-  if (key === 'BLOCK') {
-    const streak = state[player].blockStreak;
-    const acc = Math.round(getBlockAccuracy(streak) * 100);
-    const cls = acc >= 80 ? 'acc-high' : acc >= 40 ? 'acc-mid' : 'acc-low';
-    const streakLabel = streak > 0 ? ` ×${streak}` : '';
-    return `<span class="stat-acc ${cls}">ACC:${acc}%${streakLabel}</span>`;
-  }
-  const base = MOVE_ACCURACY[key] || 1.0;
-  const pct = Math.round(Math.min(1.0, base) * 100);
-  const cls = pct >= 100 ? 'acc-high' : pct >= 85 ? 'acc-mid' : 'acc-low';
-  return `<span class="stat-acc ${cls}">ACC:${pct}%</span>`;
+// ===== STAT LINE (stats + ACC merged) =====
+function buildStatLine(player, key) {
+  const move = MOVES[key];
+  const parts = [];
+
+  if (move.dmg && move.dmg !== 'x2') parts.push(`<span class="stat-dmg">DMG:${move.dmg}</span>`);
+  if (move.dmg === 'x2')             parts.push(`<span class="stat-dmg">×2</span>`);
+  if (move.heal)                     parts.push(`<span class="stat-heal">+${move.heal}HP</span>`);
+  if (move.defence)                  parts.push(`<span class="stat-def">DEF:${move.defence}</span>`);
+
+  const priSign = move.priority >= 0 ? '+' : '';
+  parts.push(`<span>P:${priSign}${move.priority}</span>`);
+
+  // ACC inline — always last
+  parts.push(buildAccSpan(player, key));
+
+  return parts.join(' ');
 }
 
-// Refresh just the accuracy line on all cards for a player
+function buildAccSpan(player, key) {
+  if (key === 'BLOCK') {
+    const streak = state[player].blockStreak;
+    const pct = Math.round(getBlockAccuracy(streak) * 100);
+    const cls = pct >= 80 ? 'acc-high' : pct >= 40 ? 'acc-mid' : 'acc-low';
+    const streakSuffix = streak > 0 ? ` ×${streak}` : '';
+    return `<span class="stat-acc ${cls}">ACC:${pct}%${streakSuffix}</span>`;
+  }
+  const rawPct = Math.round((MOVE_ACCURACY[key] || 1.0) * 100);
+  // >100% = always hits = green; 85-99 = yellow; <85 = red
+  const cls = rawPct >= 100 ? 'acc-high' : rawPct >= 85 ? 'acc-mid' : 'acc-low';
+  return `<span class="stat-acc ${cls}">ACC:${rawPct}%</span>`;
+}
+
+// Refresh stats line for all cards of a player (e.g. after block streak changes)
 function refreshAccDisplay(player) {
   const container = player === 'p1' ? els.p1Cards : els.p2Cards;
   container.querySelectorAll('.card').forEach(card => {
     const key = card.dataset.move;
-    const accEl = card.querySelector('.card-acc-line');
-    if (accEl) accEl.innerHTML = buildAccLine(player, key);
+    const statsEl = card.querySelector('.card-stats');
+    if (statsEl) statsEl.innerHTML = buildStatLine(player, key);
   });
 }
 
@@ -657,12 +677,15 @@ async function resolveRound() {
   const p1Hit = rollAccuracy('p1', state.p1.move);
   const p2Hit = rollAccuracy('p2', state.p2.move);
 
-  // Log accuracy outcomes
+  // Store block hit results for sequential-turn defence checks
+  roundBlockHit.p1 = (state.p1.move === 'BLOCK') ? p1Hit : null;
+  roundBlockHit.p2 = (state.p2.move === 'BLOCK') ? p2Hit : null;
+
   const p1Pct = getAccPct('p1', state.p1.move);
   const p2Pct = getAccPct('p2', state.p2.move);
   logEntry(`P1 ACC:${p1Pct}% → ${p1Hit ? 'HIT' : 'MISS'} | ${p2Label} ACC:${p2Pct}% → ${p2Hit ? 'HIT' : 'MISS'}`, 'log-info');
 
-  // ===== UPDATE BLOCK STREAKS (before applying effects) =====
+  // ===== UPDATE BLOCK STREAKS =====
   updateBlockStreak('p1', state.p1.move, p1Hit);
   updateBlockStreak('p2', state.p2.move, p2Hit);
 
@@ -701,29 +724,31 @@ async function resolveRound() {
 // ===== BLOCK STREAK TRACKING =====
 function updateBlockStreak(player, moveKey, hit) {
   if (moveKey === 'BLOCK') {
-    // Only increment streak if block successfully activated; reset on miss
     if (hit) state[player].blockStreak++;
-    else state[player].blockStreak = 0;
+    else     state[player].blockStreak = 0;
   } else {
-    // Any non-block move resets the streak
     state[player].blockStreak = 0;
   }
 }
 
 // ===== SIMULTANEOUS TURNS =====
 async function applySimultaneous(m1, m2, p1Hit = true, p2Hit = true) {
-  // If a move missed, its effects are zeroed
   const dmg1To2 = p1Hit ? calcDamage('p1', m1, 'p2', m2) : 0;
   const dmg2To1 = p2Hit ? calcDamage('p2', m2, 'p1', m1) : 0;
-  const heal1   = (p1Hit && m1.heal)    ? m1.heal    : 0;
-  const heal2   = (p2Hit && m2.heal)    ? m2.heal    : 0;
-  const def2    = (p2Hit && m2.defence) ? m2.defence : 0;
-  const def1    = (p1Hit && m1.defence) ? m1.defence : 0;
+  const heal1   = (p1Hit && m1.heal) ? m1.heal : 0;
+  const heal2   = (p2Hit && m2.heal) ? m2.heal : 0;
+
+  // Block only reduces damage if it SUCCEEDED (hit)
+  const def2 = (p2Hit && m2.defence) ? m2.defence : 0;
+  const def1 = (p1Hit && m1.defence) ? m1.defence : 0;
+
   const actual1To2 = Math.max(0, dmg1To2 - def2);
   const actual2To1 = Math.max(0, dmg2To1 - def1);
 
-  if (!p1Hit) { spawnMissText('p1'); await delay(400); }
-  if (!p2Hit) { spawnMissText('p2'); await delay(400); }
+  if (!p1Hit && m1.name === 'BLOCK') { spawnMissText('p1'); await delay(400); }
+  if (!p2Hit && m2.name === 'BLOCK') { spawnMissText('p2'); await delay(400); }
+  if (!p1Hit && m1.name !== 'BLOCK') { spawnMissText('p1'); await delay(400); }
+  if (!p2Hit && m2.name !== 'BLOCK') { spawnMissText('p2'); await delay(400); }
 
   applyDamage('p2', actual1To2, 'p1', m1);
   applyDamage('p1', actual2To1, 'p2', m2);
@@ -733,7 +758,7 @@ async function applySimultaneous(m1, m2, p1Hit = true, p2Hit = true) {
   updateHUD();
 }
 
-// ===== SINGLE TURN WITH ACCURACY =====
+// ===== SINGLE TURN =====
 async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = false, hit = true) {
   const p2Label = gameMode === 'online' ? 'Opponent' : gameMode !== '2p' ? 'CPU' : 'P2';
   const attackerLabel = attacker === 'p1' ? 'Player 1' : p2Label;
@@ -741,12 +766,16 @@ async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = fa
 
   // ── MISS ──
   if (!hit) {
-    const missMsg = atkMove.name === 'BLOCK'
-      ? `${attackerLabel}'s BLOCK fizzled!\nToo tired to hold guard — streak reset!`
-      : atkMove.name === 'HEAL'
-      ? `${attackerLabel}'s HEAL fizzled!\nConcentration broken — no HP restored!`
-      : `${attackerLabel}'s ${atkMove.name} MISSED!\nThe attack whiffed completely!`;
-    await showDialog(missMsg, 1800);
+    let missMsg;
+    if (atkMove.name === 'BLOCK') {
+      // Block failed: clear warning message, no defence this round
+      missMsg = `${attackerLabel}'s BLOCK FAILED!\nToo tired to hold guard!\nTaking full damage — streak reset!`;
+    } else if (atkMove.name === 'HEAL') {
+      missMsg = `${attackerLabel}'s HEAL fizzled!\nConcentration broken — no HP restored!`;
+    } else {
+      missMsg = `${attackerLabel}'s ${atkMove.name} MISSED!\nThe attack whiffed completely!`;
+    }
+    await showDialog(missMsg, 2000);
     await animateMiss(attacker, atkMove);
     return;
   }
@@ -754,13 +783,20 @@ async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = fa
   // ── HIT ──
   const dmg = calcDamage(attacker, atkMove, defender, defMove);
   const heal = atkMove.heal || 0;
-  const defenderDef = defMove.defence || 0;
+
+  // Defence from defender's block only applies if defender's block HIT this round.
+  // We check roundBlockHit[defender] — null means they didn't use block, true/false = hit/miss.
+  const defenderBlockHit = roundBlockHit[defender];
+  const defenderDef = (defMove.defence > 0 && defenderBlockHit === true) ? defMove.defence : 0;
   const actualDmg = Math.max(0, dmg - defenderDef);
 
   if (atkMove.name === 'BLOCK') {
     const streak = state[attacker].blockStreak;
     const nextAcc = Math.round(getBlockAccuracy(streak) * 100);
-    await showDialog(`${attackerLabel} takes a defensive stance!\nIncoming damage reduced by 2.\n(Next BLOCK accuracy: ${nextAcc}%)`, 1800);
+    await showDialog(
+      `${attackerLabel} takes a defensive stance!\nIncoming damage reduced by 2.\n(Next BLOCK accuracy: ${nextAcc}%)`,
+      1800
+    );
   } else if (atkMove.name === 'HEAL') {
     await showDialog(`${attackerLabel} is recovering HP!\n+6 HP restored! (Max HP -2)`, 1600);
   } else if (atkMove.name === 'COUNTER') {
@@ -833,9 +869,15 @@ function spawnMissText(target) {
 // ===== DAMAGE CALC =====
 function calcDamage(attacker, atkMove, defender, defMove) {
   if (atkMove.name === 'COUNTER') {
-    if (defMove.name === 'QUICK ATK') { logEntry(`${attacker.toUpperCase()} COUNTER — too slow for QUICK ATK!`, 'log-info'); return 0; }
+    if (defMove.name === 'QUICK ATK') {
+      logEntry(`${attacker.toUpperCase()} COUNTER — too slow for QUICK ATK!`, 'log-info');
+      return 0;
+    }
     const isDefenderAttacking = ['ATK', 'HEAVY ATK'].includes(defMove.name);
-    if (!isDefenderAttacking) { logEntry(`${attacker.toUpperCase()} COUNTER — no attack to reflect!`, 'log-info'); return 0; }
+    if (!isDefenderAttacking) {
+      logEntry(`${attacker.toUpperCase()} COUNTER — no attack to reflect!`, 'log-info');
+      return 0;
+    }
     const defDmg = defMove.dmg || 0;
     logEntry(`${attacker.toUpperCase()} COUNTERS — reflects ${defDmg * 2} dmg!`, 'log-dmg');
     return defDmg * 2;
@@ -848,7 +890,9 @@ function applyDamage(target, amount, source, srcMove) {
   state[target].hp = Math.max(0, state[target].hp - amount);
   const p2Label = gameMode === 'online' ? 'OPP' : gameMode !== '2p' ? 'CPU' : 'P2';
   logEntry(`${source === 'p2' ? p2Label : 'P1'} hits ${target === 'p2' ? p2Label : 'P1'} for ${amount} dmg!`, 'log-dmg');
-  spawnDamageNumber(target, amount, srcMove && srcMove.name === 'COUNTER' ? 'counter' : 'dmg');
+  // Counter shows as negative damage number (same colour purple, but -N not ×N)
+  const isCounter = srcMove && srcMove.name === 'COUNTER';
+  spawnDamageNumber(target, amount, isCounter ? 'counter' : 'dmg');
 }
 
 function applyHealEffect(player, amount, move) {
@@ -1115,7 +1159,8 @@ function spawnDamageNumber(target, amount, type = 'dmg') {
   const rect = sprite.getBoundingClientRect();
   const el = document.createElement('div');
   const colors = { dmg: '#ff4444', heal: '#2ecc71', counter: '#b04aff' };
-  const symbols = { dmg: `-${amount}`, heal: `+${amount}`, counter: `×${amount}` };
+  // Counter now shows -N (actual negative damage) instead of ×N
+  const symbols = { dmg: `-${amount}`, heal: `+${amount}`, counter: `-${amount}` };
   const isMobile = window.innerWidth < 480;
   el.style.cssText = `
     position:fixed;
