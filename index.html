@@ -13,15 +13,9 @@
 </head>
 <body>
 
-<!-- NDS CONSOLE SHELL -->
 <div class="console-shell">
 
-  <!-- ══════════════════════════════════
-       TOP HALF — Game Screen
-       ══════════════════════════════════ -->
   <div class="nds-top">
-
-    <!-- Brand strip -->
     <div class="nds-brand">
       <span class="nds-brand-name">BRAWL SYS</span>
       <div class="nds-leds">
@@ -31,17 +25,15 @@
       </div>
     </div>
 
-    <!-- Screen bezel -->
     <div class="nds-screen-bezel">
       <div class="bezel-corner tl"></div>
       <div class="bezel-corner tr"></div>
       <div class="bezel-corner bl"></div>
       <div class="bezel-corner br"></div>
 
-      <!-- GAME VIEWPORT -->
       <div class="console-screen">
 
-        <!-- SCREEN: TITLE -->
+        <!-- TITLE -->
         <div id="screen-title" class="screen active">
           <div class="title-bg"></div>
           <div class="title-content">
@@ -79,7 +71,7 @@
           </div>
         </div>
 
-        <!-- SCREEN: RULES -->
+        <!-- RULES -->
         <div id="screen-rules" class="screen">
           <div class="rules-panel">
             <h2 class="panel-title">HOW TO PLAY</h2>
@@ -108,7 +100,7 @@
           </div>
         </div>
 
-        <!-- SCREEN: GAME -->
+        <!-- GAME -->
         <div id="screen-game" class="screen">
           <div class="top-bar">
             <div class="fighter-hud p1-hud">
@@ -143,8 +135,13 @@
               <div id="battle-log" class="battle-log"></div>
             </div>
           </div>
+          <div id="poke-dialog" class="poke-dialog hidden">
+            <div id="poke-dialog-text" class="poke-dialog-text"></div>
+            <div id="poke-dialog-arrow" class="poke-dialog-arrow hidden">▼</div>
+          </div>
+        </div>
 
-        <!-- SCREEN: RESULT -->
+        <!-- RESULT -->
         <div id="screen-result" class="screen">
           <div class="result-panel">
             <div class="result-ko">K.O.</div>
@@ -159,30 +156,18 @@
     </div><!-- /nds-screen-bezel -->
   </div><!-- /nds-top -->
 
-
-  <!-- ══════════════════════════════════
-       HINGE BAR
-       ══════════════════════════════════ -->
   <div class="nds-hinge">
     <div class="hinge-bump"></div>
     <div class="hinge-bump"></div>
     <div class="hinge-bump"></div>
   </div>
 
-
-  <!-- ══════════════════════════════════
-       BOTTOM HALF — Info Screen + Controls
-       ══════════════════════════════════ -->
   <div class="nds-bottom">
-
-    <!-- BOTTOM SCREEN — Card Selection (the real NDS second screen) -->
     <div class="nds-info-bezel">
       <div class="nds-info-screen nds-card-screen">
 
-        <!-- Phase banner lives at top of bottom screen -->
         <div id="phase-banner" class="phase-banner hidden">CHOOSE YOUR MOVE</div>
 
-        <!-- Card selection panels -->
         <div class="selection-area" id="selection-area">
           <div class="player-panel" id="p1-panel">
             <div class="player-panel-title p1-color" id="p1-panel-title">⚡ P1 — CHOOSE</div>
@@ -197,7 +182,6 @@
           </div>
         </div>
 
-        <!-- CPU / online status -->
         <div id="cpu-thinking" class="cpu-thinking hidden">
           <span class="cpu-dots">CPU IS THINKING<span class="dot-anim">...</span></span>
         </div>
@@ -205,7 +189,6 @@
           <span class="cpu-dots">WAITING FOR OPPONENT<span class="dot-anim">...</span></span>
         </div>
 
-        <!-- Resolve button -->
         <div class="resolve-wrap">
           <button id="btn-resolve" class="btn-resolve hidden">⚔ RESOLVE ROUND ⚔</button>
         </div>
@@ -213,16 +196,12 @@
       </div>
     </div>
 
-    <!-- Controls row -->
     <div class="nds-controls">
-      <!-- D-PAD left -->
       <div class="console-dpad">
         <div class="dpad-h"></div>
         <div class="dpad-v"></div>
         <div class="dpad-center"></div>
       </div>
-
-      <!-- Center menu buttons -->
       <div class="console-menu-btns">
         <div class="menu-btn-row">
           <div class="console-menu-btn"></div>
@@ -230,8 +209,6 @@
         </div>
         <div class="console-logo-center">BRAWL</div>
       </div>
-
-      <!-- Action buttons right -->
       <div class="console-action-btns">
         <div class="action-btn btn-x">X</div>
         <div class="action-btn btn-y">Y</div>
@@ -240,7 +217,6 @@
       </div>
     </div>
 
-    <!-- Speaker grills -->
     <div class="console-speakers">
       <div class="speaker-grill">
         <div class="speaker-dot"></div><div class="speaker-dot"></div>
@@ -259,7 +235,6 @@
 
 </div><!-- /console-shell -->
 
-<!-- HIT EFFECT OVERLAY -->
 <div id="hit-overlay" class="hit-overlay"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
