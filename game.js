@@ -360,19 +360,24 @@ function resetTimers() {
     suddenDeath: false,
   };
   updateTimerHUD();
-  if (timerState._matchTimer) clearInterval(timerState._matchTimer);
-  timerState._matchTimer = setInterval(() => {
-      timerState.matchLeft = Math.max(0, timerState.matchLeft - 0.1);
+    if (timerState._matchTimer) clearInterval(timerState._matchTimer);
+    if (gameMode === 'online' && !onlineOpponentConnected) return;
+    let lastMatchTick = Date.now();
+    timerState._matchTimer = setInterval(() => {
+      const now = Date.now();
+      const dt = (now - lastMatchTick) / 1000;
+      lastMatchTick = now;
+      timerState.matchLeft = Math.max(0, timerState.matchLeft - dt);
       updateTimerHUD();
       if (timerState.matchLeft <= 0) {
-      clearInterval(timerState._matchTimer);
-      const waitForRound = setInterval(() => {
-        if (state.phase === 'p1-choose') {
-          clearInterval(waitForRound);
-          triggerSuddenDeath();
-        }
-      }, 200);
-    }
+        clearInterval(timerState._matchTimer);
+        const waitForRound = setInterval(() => {
+          if (state.phase === 'p1-choose') {
+            clearInterval(waitForRound);
+            triggerSuddenDeath();
+          }
+        }, 200);
+      }
     }, 100);
   }
 
@@ -578,6 +583,9 @@ function startGame() {
   updateModeUI();
   hideDialog();
   resetTimers();
+  if (gameMode === 'online') {
+    if (timerState._matchTimer) clearInterval(timerState._matchTimer);
+  }
   // Show timer bar during game
   if (els.timerBar) els.timerBar.classList.remove('hidden');
   hideSuddenDeathOverlay();
