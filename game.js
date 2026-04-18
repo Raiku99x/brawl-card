@@ -745,8 +745,8 @@ async function applySimultaneous(m1, m2, p1Hit = true, p2Hit = true) {
   const actual1To2 = Math.max(0, dmg1To2 - def2);
   const actual2To1 = Math.max(0, dmg2To1 - def1);
 
-  if (!p1Hit && m1.name === 'BLOCK') { spawnMissText('p1'); await delay(400); }
-  if (!p2Hit && m2.name === 'BLOCK') { spawnMissText('p2'); await delay(400); }
+  if (!p1Hit && m1.name === 'BLOCK') { spawnMissText('p1', 'BLOCK FAILED!'); await delay(400); }
+  if (!p2Hit && m2.name === 'BLOCK') { spawnMissText('p2', 'BLOCK FAILED!'); await delay(400); }
   if (!p1Hit && m1.name !== 'BLOCK') { spawnMissText('p1'); await delay(400); }
   if (!p2Hit && m2.name !== 'BLOCK') { spawnMissText('p2'); await delay(400); }
 
@@ -840,11 +840,11 @@ async function animateMiss(attacker, atkMove) {
   atkSprite.style.filter = '';
   await delay(400);
   atkSprite.style.transition = '';
-  spawnMissText(attacker);
+  spawnMissText(attacker, atkMove.name === 'BLOCK' ? 'BLOCK FAILED!' : 'MISS!');
   await delay(300);
 }
 
-function spawnMissText(target) {
+function spawnMissText(target, label = 'MISS!') {
   const sprite = target === 'p1' ? els.p1Sprite : els.p2Sprite;
   const rect = sprite.getBoundingClientRect();
   const el = document.createElement('div');
@@ -861,7 +861,7 @@ function spawnMissText(target) {
     transform:translate(-50%,-50%);
     animation:dmgFloat 0.9s cubic-bezier(0.2,1.4,0.4,1) forwards;
   `;
-  el.textContent = 'MISS!';
+  el.textContent = label;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 900);
 }
