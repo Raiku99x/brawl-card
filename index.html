@@ -128,24 +128,21 @@
             </div>
           </div>
           <div class="arena">
-            <div class="fighter-sprite p1-sprite" id="p1-sprite">
-              <img class="card-art" src="p1.png" alt="Player 1" onerror="this.style.display='none'"/>
-              <span class="card-label">P1</span>
-            </div>
-            <div class="arena-center"></div>
-              <div class="arena-bottom-log">
-                <div id="battle-log" class="battle-log"></div>
+            <div class="arena-sprites-row">
+              <div class="fighter-sprite p1-sprite" id="p1-sprite">
+                <img class="card-art" src="p1.png" alt="Player 1" onerror="this.style.display='none'"/>
+                <span class="card-label">P1</span>
               </div>
-            <div class="fighter-sprite p2-sprite" id="p2-sprite">
-              <img class="card-art" src="p2.png" alt="Player 2" onerror="this.style.display='none'"/>
-              <span class="card-label">P2</span>
+              <div class="arena-center"></div>
+              <div class="fighter-sprite p2-sprite" id="p2-sprite">
+                <img class="card-art" src="p2.png" alt="Player 2" onerror="this.style.display='none'"/>
+                <span class="card-label">P2</span>
+              </div>
+            </div>
+            <div class="arena-bottom-log">
+              <div id="battle-log" class="battle-log"></div>
             </div>
           </div>
-          <div id="poke-dialog" class="poke-dialog hidden">
-            <div id="poke-dialog-text" class="poke-dialog-text"></div>
-            <div id="poke-dialog-arrow" class="poke-dialog-arrow hidden">▼</div>
-          </div>
-        </div>
 
         <!-- SCREEN: RESULT -->
         <div id="screen-result" class="screen">
