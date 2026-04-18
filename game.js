@@ -86,8 +86,8 @@ let onlineJoinTimeout = null;
 
 // ===== GAME STATE =====
 let state = {
-  p1: { hp: 10, maxHp: 10, move: null, blockStreak: 0 },
-  p2: { hp: 10, maxHp: 10, move: null, blockStreak: 0 },
+  p1: { hp: 20, maxHp: 20, move: null, blockStreak: 0 },
+  p2: { hp: 20, maxHp: 20, move: null, blockStreak: 0 },
   round: 1,
   phase: 'p1-choose',
   p1MoveHistory: [],
