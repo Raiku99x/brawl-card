@@ -361,17 +361,14 @@ function resetTimers() {
   updateTimerHUD();
   if (timerState._matchTimer) clearInterval(timerState._matchTimer);
   timerState._matchTimer = setInterval(() => {
-    if (els.matchClock) {
-      els.matchClock.textContent = fmtTime(timerState.matchLeft);
-      const mpct = timerState.matchLeft / TIMER_CONFIG.MATCH_TIME;
-      els.matchClock.className = 'match-clock' + (mpct > 0.3 ? '' : mpct > 0.15 ? ' warn' : ' danger');
-    }
-    if (timerState.matchLeft <= 0) {
-      clearInterval(timerState._matchTimer);
-      triggerSuddenDeath();
-    }
-  }, 100);
-}
+      timerState.matchLeft = Math.max(0, timerState.matchLeft - 0.1);
+      updateTimerHUD();
+      if (timerState.matchLeft <= 0) {
+        clearInterval(timerState._matchTimer);
+        triggerSuddenDeath();
+      }
+    }, 100);
+  }
 
 function stopMoveTimer() {
   if (timerState.activeTimer) {
