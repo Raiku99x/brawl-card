@@ -747,8 +747,8 @@ async function applySimultaneous(m1, m2, p1Hit = true, p2Hit = true) {
 
   if (!p1Hit && m1.name === 'BLOCK') { spawnMissText('p1', 'BLOCK FAILED!'); await delay(400); }
   if (!p2Hit && m2.name === 'BLOCK') { spawnMissText('p2', 'BLOCK FAILED!'); await delay(400); }
-  if (!p1Hit && m1.name !== 'BLOCK') { spawnMissText('p1'); await delay(400); }
-  if (!p2Hit && m2.name !== 'BLOCK') { spawnMissText('p2'); await delay(400); }
+  if (!p1Hit && m1.name !== 'BLOCK') { spawnMissText('p2', 'MISS!'); await delay(400); }
+  if (!p2Hit && m2.name !== 'BLOCK') { spawnMissText('p1', 'MISS!'); await delay(400); }
 
   applyDamage('p2', actual1To2, 'p1', m1);
   applyDamage('p1', actual2To1, 'p2', m2);
@@ -840,7 +840,8 @@ async function animateMiss(attacker, atkMove) {
   atkSprite.style.filter = '';
   await delay(400);
   atkSprite.style.transition = '';
-  spawnMissText(attacker, atkMove.name === 'BLOCK' ? 'BLOCK FAILED!' : 'MISS!');
+  const missTarget = atkMove.name === 'BLOCK' ? attacker : (attacker === 'p1' ? 'p2' : 'p1');
+  spawnMissText(missTarget, atkMove.name === 'BLOCK' ? 'BLOCK FAILED!' : 'MISS!');
   await delay(300);
 }
 
