@@ -74,7 +74,7 @@ body {
    ============================================= */
 .console-shell {
   position: relative;
-  width: min(380px, 100%);
+  width: min(520px, 100%);
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -215,7 +215,7 @@ body {
   border-radius: 3px;
   overflow: hidden;
   width: 100%;
-  height: clamp(240px, 44dvh, 400px);
+  height: clamp(300px, 52dvh, 520px);
 }
 .console-screen::before {
   content: '';
@@ -838,7 +838,7 @@ body {
 .p2-hud { align-items: flex-end; text-align: right; }
 .fighter-name {
   font-family: var(--font-title);
-  font-size: clamp(0.44rem, 1.7vw, 0.64rem);
+  font-size: clamp(0.6rem, 1.7vw, 0.82rem);
   letter-spacing: 0.02em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
 }
@@ -863,7 +863,7 @@ body {
 
 .hp-text {
   font-family: var(--font-mono);
-  font-size: clamp(0.36rem, 1.2vw, 0.5rem);
+  font-size: clamp(0.48rem, 1.2vw, 0.62rem);
   color: var(--muted);
 }
 
@@ -1288,8 +1288,8 @@ body {
 
 @media (min-width: 580px) {
   body { padding: 20px; }
-  .console-shell { width: min(420px, 88vw); }
-  .console-screen { height: clamp(270px, 46dvh, 420px); }
+  .console-shell { width: min(560px, 92vw); }
+  .console-screen { height: clamp(320px, 52dvh, 500px); }
   .nds-info-screen { height: clamp(70px, 12dvh, 110px); }
   .card { min-width: 50px; padding: 5px; }
   .card-emoji { display: none; }
@@ -1299,8 +1299,8 @@ body {
 
 @media (min-width: 800px) {
   body { padding: 28px; }
-  .console-shell { width: min(400px, 52vw); }
-  .console-screen { height: clamp(280px, 48dvh, 440px); }
+  .console-shell { width: min(580px, 62vw); }
+  .console-screen { height: clamp(340px, 54dvh, 560px); }
 }
 
 @media (min-width: 1024px) {
@@ -1312,13 +1312,13 @@ body {
       radial-gradient(ellipse at 50% 50%, rgba(247,201,72,0.025) 0%, transparent 55%),
       linear-gradient(160deg, #060610 0%, #0c0c18 60%, #07070e 100%);
   }
-  .console-shell { width: min(380px, 36vw); }
-  .console-screen { height: clamp(280px, 46dvh, 460px); }
+  .console-shell { width: min(580px, 48vw); }
+  .console-screen { height: clamp(360px, 52dvh, 580px); }
 }
 
 @media (min-width: 1400px) {
-  .console-shell { width: min(420px, 30vw); }
-  .console-screen { height: clamp(300px, 48dvh, 500px); }
+  .console-shell { width: min(620px, 38vw); }
+  .console-screen { height: clamp(380px, 54dvh, 620px); }
 }
 
 /* Landscape phone */
