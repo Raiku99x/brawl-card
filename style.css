@@ -805,7 +805,7 @@ body {
 .mode-badge.online { color: var(--online); }
 
 /* =============================================
-   ARENA — fixed layout: sprites side by side, log below
+   ARENA
    ============================================= */
 .arena {
   flex: 1;
@@ -833,7 +833,6 @@ body {
   z-index: 1;
 }
 
-/* Sprites row — P1 left, P2 right, fills available height */
 .arena-sprites-row {
   display: flex;
   flex-direction: row;
@@ -844,14 +843,12 @@ body {
   padding: 8px 12px 4px;
 }
 
-/* Hidden center spacer — keeps sprites pushed to edges */
 .arena-center {
   flex: 1;
   min-width: 0;
   display: block;
 }
 
-/* FIGHTER CARDS — bigger */
 .fighter-sprite {
   position: relative;
   width: clamp(100px, 24vw, 140px);
@@ -904,7 +901,6 @@ body {
   text-overflow: ellipsis;
 }
 
-/* P1 card — gold trim */
 .p1-sprite {
   border-color: var(--p1-dark);
   box-shadow:
@@ -918,7 +914,6 @@ body {
   text-shadow: 0 0 6px rgba(247,201,72,0.5);
 }
 
-/* P2 card — red trim */
 .p2-sprite {
   border-color: var(--p2-dark);
   box-shadow:
@@ -957,7 +952,6 @@ body {
   100% { transform: translateX(0); }
 }
 
-/* Battle log — bottom of arena, full width */
 .arena-bottom-log {
   width: 100%;
   flex-shrink: 0;
@@ -1048,7 +1042,7 @@ body {
 }
 .cards-row { display: flex; flex-wrap: wrap; gap: 3px; }
 
-/* CARDS — slightly bigger */
+/* CARDS */
 .card {
   cursor: pointer;
   background: linear-gradient(150deg, #181828, #101018);
@@ -1240,14 +1234,34 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
+/* Accuracy */
+.card-acc-line { margin-top: 2px; }
+.stat-acc {
+  font-family: var(--font-mono);
+  font-size: clamp(0.28rem, 0.85vw, 0.38rem);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.stat-acc.acc-high { color: #2ecc71; }
+.stat-acc.acc-mid  { color: #f7c948; }
+.stat-acc.acc-low  {
+  color: #e03c3c;
+  animation: accWarn 0.8s ease-in-out infinite alternate;
+}
+@keyframes accWarn {
+  from { opacity: 0.6; }
+  to   { opacity: 1; box-shadow: 0 0 5px rgba(224,60,60,0.4); }
+}
+
 /* =============================================
-   RESPONSIVE
+   RESPONSIVE — DESKTOP UPSCALING
    ============================================= */
+
 @media (min-width: 580px) {
   body { padding: 20px; }
   .console-shell { width: min(560px, 92vw); }
   .console-screen { height: clamp(320px, 52dvh, 500px); }
-  .nds-info-screen { height: clamp(70px, 12dvh, 110px); }
+  .nds-info-screen.nds-card-screen { min-height: clamp(70px, 12dvh, 110px); }
   .card { min-width: 50px; padding: 5px; }
   .card-name  { font-size: 0.52rem; }
   .card-stats { font-size: 0.46rem; }
@@ -1295,70 +1309,208 @@ body {
     align-items: stretch;
     gap: 0;
   }
-  .nds-top {
-    flex: 1.5;
-    border-radius: 14px 0 0 14px;
-    padding: 6px 10px;
-  }
+  .nds-top { flex: 1.5; border-radius: 14px 0 0 14px; padding: 6px 10px; }
   .nds-hinge {
-    width: 16px;
-    height: auto;
-    flex-direction: column;
-    flex-shrink: 0;
+    width: 16px; height: auto; flex-direction: column; flex-shrink: 0;
   }
   .nds-hinge::before {
-    width: 1px; height: 100%;
-    left: 0; top: 0; right: auto; bottom: auto;
+    width: 1px; height: 100%; left: 0; top: 0; right: auto; bottom: auto;
     background: linear-gradient(180deg, transparent 0%, var(--shell-neon) 25%, var(--shell-neon) 75%, transparent 100%);
   }
   .nds-hinge::after {
-    width: 1px; height: 100%;
-    right: 0; top: 0; left: auto; bottom: auto;
+    width: 1px; height: 100%; right: 0; top: 0; left: auto; bottom: auto;
     background: linear-gradient(180deg, transparent 0%, var(--shell-neon2) 25%, var(--shell-neon2) 75%, transparent 100%);
   }
   .hinge-bump { width: 10px; height: 22px; margin: 10px 0; }
-  .nds-bottom {
-    flex: 1;
-    border-radius: 0 14px 14px 0;
-    padding: 6px 10px 10px;
-  }
+  .nds-bottom { flex: 1; border-radius: 0 14px 14px 0; padding: 6px 10px 10px; }
   .console-screen { height: 100%; }
   .nds-info-screen { height: clamp(50px, 9dvh, 80px); }
   .card { padding: 2px 3px; }
   .poke-dialog { min-height: 34px; padding: 4px 8px; }
+  .fighter-sprite { width: clamp(70px, 14vw, 100px); height: clamp(95px, 18vw, 135px); }
+}
+
+/* =============================================
+   MOBILE-FIRST — phones ≤ 520px
+   Main target: the screenshot device (~390px wide)
+   ============================================= */
+@media (max-width: 520px) {
+  body {
+    padding: 4px;
+    align-items: flex-start;
+  }
+
+  .console-shell { width: 100%; }
+
+  /* ── Top screen: shrink it, sprites fill it better ── */
+  .console-screen {
+    height: clamp(210px, 36dvh, 280px);
+  }
+
+  /* ── Sprites: bigger, vertically centered ── */
   .fighter-sprite {
-    width: clamp(70px, 14vw, 100px);
-    height: clamp(95px, 18vw, 135px);
+    width: clamp(118px, 30vw, 155px);
+    height: clamp(155px, 38vw, 200px);
+  }
+
+  .arena-sprites-row {
+    padding: 6px 10px 2px;
+    align-items: center;
+  }
+
+  /* ── Battle log: compact ── */
+  .battle-log {
+    font-size: 0.60rem;
+    max-height: 48px;
+    min-height: 32px;
+    padding: 3px 7px;
+  }
+
+  /* ── Bottom info screen: taller — this is where the game happens ── */
+  .nds-info-screen.nds-card-screen {
+    min-height: clamp(210px, 42dvh, 300px);
+  }
+
+  /* ── Phase banner: readable ── */
+  .phase-banner {
+    font-size: 0.90rem;
+    padding: 8px 8px;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Player panel ── */
+  .player-panel {
+    padding: 8px 7px 8px;
+    gap: 6px;
+  }
+
+  /* ── Panel title: big and punchy ── */
+  .player-panel-title {
+    font-size: 0.85rem;
+    letter-spacing: 0.02em;
+    margin-bottom: 3px;
+  }
+
+  /* ── Cards: 3-col grid, big tap targets ── */
+  .cards-row {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 6px !important;
+    width: 100%;
+  }
+
+  .card {
+    min-width: 0 !important;
+    width: 100% !important;
+    padding: 10px 6px 9px !important;
+    min-height: 62px !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  /* ── Card name: legible ── */
+  .card-name {
+    font-size: 0.78rem !important;
+    letter-spacing: 0.01em;
+    line-height: 1.1;
+    text-align: center;
+  }
+
+  /* ── Card stats: readable ── */
+  .card-stats {
+    font-size: 0.54rem !important;
+    line-height: 1.45;
+    text-align: center;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1px 4px;
+    margin-top: 1px;
+  }
+
+  .stat-acc {
+    font-size: 0.52rem !important;
+  }
+
+  /* ── Selected display ── */
+  .selected-display {
+    font-size: 0.64rem;
+    letter-spacing: 0.02em;
+    min-height: 14px;
+    margin-top: 2px;
+  }
+
+  /* ── single-panel: same 3-col grid ── */
+  .single-panel .cards-row {
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 6px !important;
+  }
+
+  /* ── Resolve button: bigger tap area ── */
+  .btn-resolve {
+    font-size: 0.88rem;
+    padding: 11px 16px;
+    min-height: 44px;
+  }
+
+  .resolve-wrap { padding: 5px 6px; }
+
+  /* ── CPU / online waiting ── */
+  .cpu-thinking {
+    font-size: 0.66rem;
+    padding: 6px 8px;
+  }
+
+  /* ── HUD ── */
+  .top-bar { padding: 5px 8px; }
+  .fighter-name { font-size: 0.78rem; }
+  .hp-text { font-size: 0.60rem; }
+  .round-num { font-size: 1.2rem; }
+  .hp-bar-wrap { height: 8px; }
+
+  /* ── Poke dialog ── */
+  .poke-dialog { padding: 8px 11px; min-height: 46px; }
+  .poke-dialog-text { font-size: 0.70rem; line-height: 1.55; }
+
+  /* ── Hide decorative console chrome to reclaim vertical space ── */
+  .nds-controls,
+  .console-speakers,
+  .console-bottom-grip,
+  .nds-hinge {
+    display: none;
+  }
+
+  .nds-bottom {
+    padding: 8px 10px 10px;
+    border-radius: 6px 6px 12px 12px;
+  }
+
+  .nds-top {
+    padding: 8px 10px 10px;
+    border-radius: 12px 12px 4px 4px;
   }
 }
 
-@media (max-width: 340px) {
-  body { padding: 4px; }
-  .card { min-width: 34px; padding: 2px 2px; }
-  .card-name  { font-size: 0.33rem; }
-  .card-stats { font-size: 0.3rem; }
-  .nds-controls { padding: 6px 10px 10px; }
-  .fighter-sprite {
-    width: clamp(80px, 22vw, 110px);
-    height: clamp(108px, 28vw, 148px);
+/* ── Very small phones ── */
+@media (max-width: 360px) {
+  .console-screen {
+    height: clamp(190px, 33dvh, 250px);
   }
-}
 
-/* Accuracy */
-.card-acc-line { margin-top: 2px; }
-.stat-acc {
-  font-family: var(--font-mono);
-  font-size: clamp(0.28rem, 0.85vw, 0.38rem);
-  font-weight: 700;
-  letter-spacing: 0.03em;
-}
-.stat-acc.acc-high { color: #2ecc71; }
-.stat-acc.acc-mid  { color: #f7c948; }
-.stat-acc.acc-low  {
-  color: #e03c3c;
-  animation: accWarn 0.8s ease-in-out infinite alternate;
-}
-@keyframes accWarn {
-  from { opacity: 0.6; }
-  to   { opacity: 1; box-shadow: 0 0 5px rgba(224,60,60,0.4); }
+  .fighter-sprite {
+    width: clamp(100px, 27vw, 130px);
+    height: clamp(132px, 35vw, 172px);
+  }
+
+  .card {
+    padding: 8px 4px 7px !important;
+    min-height: 55px !important;
+  }
+
+  .card-name { font-size: 0.68rem !important; }
+  .card-stats { font-size: 0.47rem !important; }
+  .stat-acc { font-size: 0.45rem !important; }
 }
