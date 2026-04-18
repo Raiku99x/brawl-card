@@ -497,11 +497,14 @@ async function triggerSuddenDeath() {
   // Prevent match clock from triggering again
   timerState.matchLeft = 99999;
 
-  // Lock BLOCK and HEAL, rebuild cards to show locked state
+state.p1.move = null;
+  state.p2.move = null;
   buildCards('p1');
   buildCards('p2');
   greyOutSuddenDeathCards('p1');
   greyOutSuddenDeathCards('p2');
+  unlockCards('p1');
+  unlockCards('p2');
 
   // Start final round
   setPhase('p1-choose');
