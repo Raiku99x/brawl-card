@@ -414,7 +414,7 @@ function resetTimers() {
     clearInterval(timerState.activeTimer);
     timerState.activeTimer = null;
   }
-}
+
 
 function updateTimerHUD() {
   if (!els.timerBar) return;
