@@ -348,37 +348,36 @@ function fmtTime(s) {
   return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 }
 
-function resetTimers() {
+function stopMoveTimer() {
+  if (timerState.activeTimer) {
+    clearInterval(timerState.activeTimer);
+    timerState.activeTimer = null;
+  }
+}
+
+function startMoveTimer(player) {
   stopMoveTimer();
-  timerState = {
-    moveLeft:    TIMER_CONFIG.MOVE_TIME,
-    p1BankLeft:  TIMER_CONFIG.BANK_TIME,
-    p2BankLeft:  TIMER_CONFIG.BANK_TIME,
-    matchLeft:   TIMER_CONFIG.MATCH_TIME,
-    activeTimer: null,
-    paused:      false,
-    suddenDeath: false,
-  };
-  updateTimerHUD();
-    if (timerState._matchTimer) clearInterval(timerState._matchTimer);
-    if (gameMode === 'online' && !onlineOpponentConnected) return;
-    let lastMatchTick = Date.now();
-    timerState._matchTimer = setInterval(() => {
-      const now = Date.now();
-      const dt = (now - lastMatchTick) / 1000;
-      lastMatchTick = now;
-      timerState.matchLeft = Math.max(0, timerState.matchLeft - dt);
-      updateTimerHUD();
-      if (timerState.matchLeft <= 0) {
-        clearInterval(timerState._matchTimer);
-        const waitForRound = setInterval(() => {
-          if (state.phase === 'p1-choose') {
-            clearInterval(waitForRound);
-            triggerSuddenDeath();
-          }
-        }, 200);
-      }
-   function resetTimers() {
+  const moveLimit = timerState.suddenDeath
+    ? TIMER_CONFIG.SUDDEN_DEATH_MOVE_TIME
+    : TIMER_CONFIG.MOVE_TIME;
+  timerState.moveLeft = moveLimit;
+  let lastTick = Date.now();
+  timerState.activeTimer = setInterval(() => {
+    const now = Date.now();
+    const dt = (now - lastTick) / 1000;
+    lastTick = now;
+    timerState.moveLeft = Math.max(0, timerState.moveLeft - dt);
+    const bankKey = player === 'p1' ? 'p1BankLeft' : 'p2BankLeft';
+    timerState[bankKey] = Math.max(0, timerState[bankKey] - dt);
+    updateTimerHUD();
+    if (timerState.moveLeft <= 0 || timerState[bankKey] <= 0) {
+      stopMoveTimer();
+      handleTimeExpiry(player);
+    }
+  }, 100);
+}
+
+function resetTimers() {
   stopMoveTimer();
   if (timerState._matchTimer) clearInterval(timerState._matchTimer);
   timerState = {
@@ -410,11 +409,6 @@ function resetTimers() {
     }
   }, 100);
 }
-  if (timerState.activeTimer) {
-    clearInterval(timerState.activeTimer);
-    timerState.activeTimer = null;
-  }
-
 
 function updateTimerHUD() {
   if (!els.timerBar) return;
