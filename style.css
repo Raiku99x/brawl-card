@@ -1372,3 +1372,45 @@ body {
   .card-stats { font-size: 0.3rem; }
   .nds-controls { padding: 6px 10px 10px; }
 }
+
+/* Accuracy line on cards */
+.card-acc-line {
+  margin-top: 2px;
+}
+ 
+.stat-acc {
+  font-family: var(--font-mono);
+  font-size: clamp(0.28rem, 0.85vw, 0.38rem);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 1px 3px;
+  border-radius: 2px;
+}
+ 
+/* Green — high accuracy (80-100%) */
+.stat-acc.acc-high {
+  color: #2ecc71;
+  background: rgba(46, 204, 113, 0.12);
+  border: 1px solid rgba(46, 204, 113, 0.25);
+}
+ 
+/* Yellow — medium accuracy (40-79%) */
+.stat-acc.acc-mid {
+  color: #f7c948;
+  background: rgba(247, 201, 72, 0.12);
+  border: 1px solid rgba(247, 201, 72, 0.25);
+}
+ 
+/* Red — low accuracy (1-39%) */
+.stat-acc.acc-low {
+  color: #e03c3c;
+  background: rgba(224, 60, 60, 0.12);
+  border: 1px solid rgba(224, 60, 60, 0.25);
+  animation: accWarn 0.8s ease-in-out infinite alternate;
+}
+ 
+@keyframes accWarn {
+  from { opacity: 0.6; }
+  to   { opacity: 1; box-shadow: 0 0 5px rgba(224,60,60,0.4); }
+}
+
