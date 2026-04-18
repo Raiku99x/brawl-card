@@ -1057,7 +1057,7 @@ async function resolveRound() {
   const m2 = MOVES[state.p2.move];
   const p2Label = gameMode === 'online' ? 'OPP' : gameMode !== '2p' ? 'CPU' : 'P2';
 
-  logEntry(`— ROUND ${state.round} —`, 'log-info');
+  logEntry(`— TURN ${state.round} —`, 'log-info');
   logEntry(`P1: ${m1.name}  |  ${p2Label}: ${m2.name}`, 'log-info');
 
   const p1Hit = (gameMode === 'online' && state._onlineHitRolls)
