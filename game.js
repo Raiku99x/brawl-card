@@ -70,9 +70,10 @@ function getAccPct(player, moveKey) {
 
 // ===== TRIPLE-TIMER CONFIG =====
 const TIMER_CONFIG = {
-  MOVE_TIME:  15,   // seconds per turn
+  MOVE_TIME:  15,
+  SUDDEN_DEATH_MOVE_TIME: 30,
   BANK_TIME:  180,  // 3 minutes per player
-  MATCH_TIME: 240,  // 6 minutes total
+  MATCH_TIME: 10,  // 6 minutes total
 };
 
 // Sudden death moves — Block and Heal are locked out
@@ -379,7 +380,7 @@ function stopMoveTimer() {
 
 function startMoveTimer(player) {
   stopMoveTimer();
-  timerState.moveLeft = TIMER_CONFIG.MOVE_TIME;
+  timerState.moveLeft = timerState.suddenDeath ? TIMER_CONFIG.SUDDEN_DEATH_MOVE_TIME : TIMER_CONFIG.MOVE_TIME;
   timerState.paused = false;
 
   timerState.activeTimer = setInterval(() => {
@@ -1071,12 +1072,15 @@ async function resolveRound() {
   // After sudden death round — highest HP wins, no more rounds
   if (timerState.suddenDeath) {
     await delay(400);
-    // Kill the lower HP player (they "lose" the sudden death)
     if (state.p1.hp < state.p2.hp) state.p1.hp = 0;
     else if (state.p2.hp < state.p1.hp) state.p2.hp = 0;
     else {
-      // Still tied after sudden death — Double KO draw
-      state.p1.hp = 0; state.p2.hp = 0;
+      // Still tied — keep going, another sudden death round
+      state.round++;
+      els.roundNum.textContent = state.round;
+      await delay(200);
+      setPhase('p1-choose');
+      return;
     }
     updateHUD();
     await delay(500);
