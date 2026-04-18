@@ -733,7 +733,7 @@ function updateBlockStreak(player, moveKey, hit) {
 
 // ===== SIMULTANEOUS TURNS =====
 async function applySimultaneous(m1, m2, p1Hit = true, p2Hit = true) {
-  spawnClashText();
+  spawnClashText(m1.name, m2.name);
   await delay(350);
   const dmg1To2 = p1Hit ? calcDamage('p1', m1, 'p2', m2) : 0;
   const dmg2To1 = p2Hit ? calcDamage('p2', m2, 'p1', m1) : 0;
@@ -847,7 +847,7 @@ async function animateMiss(attacker, atkMove) {
   await delay(300);
 }
 
-function spawnClashText() {
+function spawnClashText(move1, move2) {
   const arena = document.querySelector('.arena');
   const rect = arena.getBoundingClientRect();
   const el = document.createElement('div');
@@ -864,7 +864,7 @@ function spawnClashText() {
     transform:translate(-50%,-50%);
     animation:dmgFloat 1.1s cubic-bezier(0.2,1.4,0.4,1) forwards;
   `;
-  el.textContent = 'CLASH!';
+  el.textContent = `CLASH! ${move1} vs ${move2}`;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 1100);
 }
