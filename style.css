@@ -815,8 +815,8 @@ body {
   justify-content: space-between;
   background: linear-gradient(to bottom, #0d0d1c, #08080e);
   border-bottom: 1px solid var(--border);
-  padding: 3px 6px;
-  gap: 4px;
+  padding: 5px 10px;
+  gap: 8px;
   flex-shrink: 0;
   position: relative;
 }
@@ -834,13 +834,13 @@ body {
   opacity: 0.3;
 }
 
-.fighter-hud { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fighter-hud { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; max-width: none; }
 .p2-hud { align-items: flex-end; text-align: right; }
 .fighter-name {
   font-family: var(--font-title);
   font-size: clamp(0.6rem, 1.7vw, 0.82rem);
   letter-spacing: 0.02em;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; width: 100%;
 }
 .p1-color     { color: var(--p1); }
 .p2-color     { color: var(--p2); }
@@ -848,7 +848,7 @@ body {
 .online-color { color: var(--online) !important; }
 
 .hp-bar-wrap {
-  width: 100%; height: 5px;
+  width: 100%; height: 7px;
   background: #060610;
   border: 1px solid var(--border);
   overflow: hidden;
@@ -867,7 +867,7 @@ body {
   color: var(--muted);
 }
 
-.round-info { text-align: center; flex-shrink: 0; width: clamp(38px, 8vw, 54px); }
+.round-info { text-align: center; flex-shrink: 0; width: clamp(54px, 8vw, 70px); }
 .round-label { font-family: var(--font-mono); font-size: 0.36rem; color: var(--muted); letter-spacing: 0.1em; }
 .round-num   { font-family: var(--font-title); font-size: clamp(1rem, 3.2vw, 1.5rem); color: var(--text); line-height: 1; }
 .mode-badge {
