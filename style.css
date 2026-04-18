@@ -28,7 +28,6 @@
   --font-mono: 'Share Tech Mono', monospace;
   --font-pixel: 'Press Start 2P', monospace;
 
-  /* NDS Shell palette — dark matte + neon trim */
   --shell: #14141f;
   --shell-light: #1c1c2c;
   --shell-mid: #10101a;
@@ -44,7 +43,6 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 html { height: 100%; }
 
 body {
@@ -69,8 +67,6 @@ body {
 
 /* =============================================
    NDS CONSOLE SHELL
-   Two halves: top (game screen) + bottom (info screen)
-   Connected by a hinge bar
    ============================================= */
 .console-shell {
   position: relative;
@@ -81,7 +77,6 @@ body {
   flex-shrink: 0;
 }
 
-/* Neon ambient glow behind the whole console */
 .console-shell::before {
   content: '';
   position: absolute;
@@ -93,7 +88,7 @@ body {
   z-index: -1;
 }
 
-/* ---- TOP HALF (game screen housing) ---- */
+/* ---- TOP HALF ---- */
 .nds-top {
   background: linear-gradient(160deg, var(--shell-light) 0%, var(--shell) 50%, var(--shell-dark) 100%);
   border-radius: 18px 18px 6px 6px;
@@ -107,7 +102,6 @@ body {
   position: relative;
 }
 
-/* Top screw details */
 .nds-top::before, .nds-top::after {
   content: '';
   position: absolute;
@@ -121,7 +115,6 @@ body {
 .nds-top::before { left: 14px; }
 .nds-top::after  { right: 14px; }
 
-/* Brand strip on top */
 .nds-brand {
   display: flex;
   align-items: center;
@@ -163,8 +156,6 @@ body {
     inset 0 3px 8px rgba(0,0,0,0.95),
     inset 0 0 0 1px rgba(255,255,255,0.02);
 }
-
-/* Neon corner accent lines */
 .nds-screen-bezel::before {
   content: '';
   position: absolute;
@@ -176,8 +167,6 @@ body {
   pointer-events: none;
   opacity: 0.35;
 }
-
-/* Scanlines */
 .nds-screen-bezel::after {
   content: '';
   position: absolute;
@@ -194,7 +183,6 @@ body {
   border-radius: 3px;
 }
 
-/* Bezel corner brackets */
 .bezel-corner {
   position: absolute;
   width: 8px; height: 8px;
@@ -208,7 +196,7 @@ body {
 .bezel-corner.bl { bottom: 3px; left: 3px;  border-width: 0 0 2px 2px; border-radius: 0 0 0 2px; }
 .bezel-corner.br { bottom: 3px; right: 3px; border-width: 0 2px 2px 0; border-radius: 0 0 2px 0; }
 
-/* ---- GAME VIEWPORT (top screen) ---- */
+/* ---- GAME VIEWPORT ---- */
 .console-screen {
   position: relative;
   background: var(--bg);
@@ -242,34 +230,20 @@ body {
     0 -2px 8px rgba(0,0,0,0.5),
     inset 0 1px 0 rgba(255,255,255,0.03);
 }
-
-/* Neon line along hinge */
 .nds-hinge::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    var(--shell-neon) 25%,
-    var(--shell-neon) 75%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg, transparent 0%, var(--shell-neon) 25%, var(--shell-neon) 75%, transparent 100%);
   opacity: 0.45;
 }
 .nds-hinge::after {
   content: '';
   position: absolute;
   bottom: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    var(--shell-neon2) 25%,
-    var(--shell-neon2) 75%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg, transparent 0%, var(--shell-neon2) 25%, var(--shell-neon2) 75%, transparent 100%);
   opacity: 0.35;
 }
-
-/* Hinge cylinder bumps */
 .hinge-bump {
   width: 28px; height: 10px;
   background: linear-gradient(to bottom, var(--shell-light), var(--shell-dark));
@@ -280,7 +254,7 @@ body {
 }
 
 /* =============================================
-   BOTTOM HALF (controls + info screen)
+   BOTTOM HALF
    ============================================= */
 .nds-bottom {
   background: linear-gradient(160deg, var(--shell-mid) 0%, var(--shell) 50%, var(--shell-dark) 100%);
@@ -294,8 +268,6 @@ body {
     inset 0 -2px 0 rgba(0,0,0,0.5);
   position: relative;
 }
-
-/* Bottom screw details */
 .nds-bottom::before, .nds-bottom::after {
   content: '';
   position: absolute;
@@ -332,14 +304,6 @@ body {
   opacity: 0.3;
 }
 
-/* SELECTION AREA — lives inside the bottom NDS screen */
-.selection-area {
-  display: flex;
-  align-items: stretch;
-  background: linear-gradient(to bottom, #0d0d1c, #08080e);
-  flex: 1;
-  overflow: hidden;
-}
 .nds-info-screen {
   background: #060610;
   border-radius: 2px;
@@ -348,11 +312,9 @@ body {
   display: flex;
   flex-direction: column;
 }
-/* Card screen is taller than a log screen */
 .nds-info-screen.nds-card-screen {
   min-height: clamp(140px, 26dvh, 220px);
 }
-/* Scanlines on info screen */
 .nds-info-screen::after {
   content: '';
   position: absolute;
@@ -368,34 +330,6 @@ body {
   z-index: 10;
 }
 
-/* Battle log — in the arena center on the top screen */
-.battle-log {
-  flex: 1;
-  background: rgba(0,0,0,0.65);
-  border: 1px solid var(--border);
-  padding: 5px 6px;
-  font-family: var(--font-mono);
-  font-size: clamp(0.38rem, 1.1vw, 0.48rem);
-  color: var(--muted);
-  line-height: 1.45;
-  width: 100%;
-  min-height: 60px;
-  max-height: clamp(70px, 14vh, 130px);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-.battle-log::-webkit-scrollbar { display: none; }
-.battle-log .log-entry { margin-bottom: 1px; }
-.log-dmg    { color: var(--p2); }
-.log-heal   { color: #2ecc71; }
-.log-block  { color: var(--accent); }
-.log-p1     { color: var(--p1); }
-.log-p2     { color: var(--p2); }
-.log-info   { color: #3a3a58; }
-.log-cpu    { color: var(--cpu); }
-.log-online { color: var(--online); }
-
 /* ---- CONTROLS ROW ---- */
 .nds-controls {
   display: grid;
@@ -404,7 +338,6 @@ body {
   gap: 6px;
 }
 
-/* D-PAD */
 .console-dpad {
   position: relative;
   width: 62px; height: 62px;
@@ -440,7 +373,6 @@ body {
 .dpad-v::before { border-bottom-color: rgba(74,240,200,0.18); transform: translate(-50%,-18px); }
 .dpad-v::after  { border-top-color: rgba(74,240,200,0.18); transform: translate(-50%,11px); }
 
-/* CENTER MENU BUTTONS */
 .console-menu-btns {
   display: flex;
   flex-direction: column;
@@ -463,7 +395,6 @@ body {
   text-align: center;
 }
 
-/* ACTION BUTTONS */
 .console-action-btns {
   position: relative;
   width: 62px; height: 62px;
@@ -488,7 +419,6 @@ body {
 .action-btn.btn-x { background: #2ab898; top: 0;     left: 50%; transform: translateX(-50%); }
 .action-btn.btn-y { background: #7830c0; left: 0;    top: 50%;  transform: translateY(-50%); }
 
-/* SPEAKER GRILLS */
 .console-speakers {
   display: flex;
   justify-content: space-between;
@@ -507,7 +437,6 @@ body {
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.9);
 }
 
-/* Bottom grip curve */
 .console-bottom-grip {
   height: 8px;
   margin: 8px 20px 0;
@@ -516,7 +445,7 @@ body {
 }
 
 /* =============================================
-   SCREENS — all rendered inside .console-screen
+   SCREENS
    ============================================= */
 .screen {
   position: absolute;
@@ -538,7 +467,6 @@ body {
   background: var(--bg);
   justify-content: flex-start;
 }
-
 .title-bg {
   position: absolute; inset: 0;
   background:
@@ -551,7 +479,6 @@ body {
   0%, 100% { opacity: 0.3; }
   50%       { opacity: 0.9; }
 }
-
 .title-content {
   position: relative;
   text-align: center;
@@ -563,7 +490,6 @@ body {
   from { opacity: 0; transform: translateY(16px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-
 .title-vs-line {
   font-family: var(--font-title);
   font-size: clamp(0.55rem, 2vw, 0.72rem);
@@ -575,7 +501,6 @@ body {
   gap: 10px;
 }
 .title-vs { color: var(--muted); font-size: 0.62rem; }
-
 .game-title {
   font-family: var(--font-title);
   font-size: clamp(2rem, 10vw, 4.2rem);
@@ -596,7 +521,6 @@ body {
   margin-bottom: 10px;
 }
 
-/* ONLINE SECTION */
 .online-section {
   margin-bottom: 8px;
   border: 1px solid var(--online-dark);
@@ -674,7 +598,6 @@ body {
   50%       { opacity: 1; }
 }
 
-/* AI DIFFICULTY */
 .ai-mode-section { margin: 6px 0 8px; }
 .ai-mode-label {
   font-family: var(--font-mono);
@@ -705,7 +628,6 @@ body {
 .btn-difficulty[data-diff="medium"]:hover,.btn-difficulty[data-diff="medium"]:active { background: var(--cpu); color: #000; }
 .btn-difficulty[data-diff="hard"]:hover,  .btn-difficulty[data-diff="hard"]:active   { background: var(--p2); color: #fff; }
 
-/* BUTTONS */
 .btn-main {
   display: block;
   font-family: var(--font-title);
@@ -882,14 +804,15 @@ body {
 .mode-badge.hard   { color: var(--p2); }
 .mode-badge.online { color: var(--online); }
 
-/* ARENA */
+/* =============================================
+   ARENA — fixed layout: sprites side by side, log below
+   ============================================= */
 .arena {
   flex: 1;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 8px 10px 0;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   background: linear-gradient(to bottom, #07070e 0%, #0b0b18 55%, #090714 100%);
   position: relative;
   overflow: hidden;
@@ -907,13 +830,32 @@ body {
     transparent 30px, transparent 36px
   );
   opacity: 0.25;
+  z-index: 1;
 }
 
-/* FIGHTER CARDS */
+/* Sprites row — P1 left, P2 right, fills available height */
+.arena-sprites-row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex: 1;
+  min-height: 0;
+  padding: 8px 12px 4px;
+}
+
+/* Hidden center spacer — keeps sprites pushed to edges */
+.arena-center {
+  flex: 1;
+  min-width: 0;
+  display: block;
+}
+
+/* FIGHTER CARDS — bigger */
 .fighter-sprite {
   position: relative;
-  width: clamp(90px, 22vw, 130px);
-  height: clamp(120px, 28vw, 170px);
+  width: clamp(100px, 24vw, 140px);
+  height: clamp(130px, 30vw, 185px);
   flex-shrink: 0;
   border-radius: 5px;
   overflow: hidden;
@@ -925,7 +867,6 @@ body {
   animation: idle-bob 1.8s ease-in-out infinite;
 }
 
-/* PNG art fills the card */
 .fighter-sprite .card-art {
   position: absolute;
   inset: 0;
@@ -936,7 +877,6 @@ body {
   display: block;
 }
 
-/* Card frame overlay — corner brackets */
 .fighter-sprite::before {
   content: '';
   position: absolute;
@@ -949,13 +889,12 @@ body {
   z-index: 2;
 }
 
-/* Name label at bottom of card */
 .fighter-sprite .card-label {
   position: absolute;
   bottom: 0; left: 0; right: 0;
-  padding: 2px 3px;
+  padding: 3px 3px;
   font-family: var(--font-pixel);
-  font-size: 0.22rem;
+  font-size: 0.28rem;
   letter-spacing: 0.06em;
   text-align: center;
   text-transform: uppercase;
@@ -993,7 +932,6 @@ body {
   text-shadow: 0 0 6px rgba(224,60,60,0.5);
 }
 
-/* CPU / Online variant trims */
 .p2-sprite.cpu-sprite {
   border-color: var(--cpu-dark);
   box-shadow: 0 0 0 1px rgba(176,74,255,0.18), 0 0 10px rgba(176,74,255,0.14), inset 0 0 12px rgba(0,0,0,0.5);
@@ -1005,15 +943,11 @@ body {
 }
 .p2-sprite.online-sprite .card-label { color: var(--online); text-shadow: 0 0 6px rgba(74,240,200,0.5); }
 
-/* Idle bob — gentle float */
 @keyframes idle-bob {
   0%, 100% { transform: translateY(0); }
   50%       { transform: translateY(-4px); }
 }
-/* Hit shake — triggered via JS class */
-.fighter-sprite.hit-shake {
-  animation: hit-shake 0.35s ease;
-}
+.fighter-sprite.hit-shake { animation: hit-shake 0.35s ease; }
 @keyframes hit-shake {
   0%   { transform: translateX(0); }
   20%  { transform: translateX(-5px); }
@@ -1023,18 +957,40 @@ body {
   100% { transform: translateX(0); }
 }
 
-.arena-center {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 6px;
-  min-width: 0;
-  align-self: center;
-  /* Battle log is now in info screen — arena center is decorative/status only */
+/* Battle log — bottom of arena, full width */
+.arena-bottom-log {
+  width: 100%;
+  flex-shrink: 0;
+  padding: 0 8px 6px;
 }
 
-/* PHASE BANNER — top of bottom screen */
+.battle-log {
+  background: rgba(0,0,0,0.72);
+  border: 1px solid var(--border);
+  padding: 5px 8px;
+  font-family: var(--font-mono);
+  font-size: clamp(0.4rem, 1.1vw, 0.52rem);
+  color: var(--muted);
+  line-height: 1.5;
+  width: 100%;
+  min-height: 52px;
+  max-height: clamp(60px, 13vh, 110px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.battle-log::-webkit-scrollbar { display: none; }
+.battle-log .log-entry { margin-bottom: 1px; }
+.log-dmg    { color: var(--p2); }
+.log-heal   { color: #2ecc71; }
+.log-block  { color: var(--accent); }
+.log-p1     { color: var(--p1); }
+.log-p2     { color: var(--p2); }
+.log-info   { color: #3a3a58; }
+.log-cpu    { color: var(--cpu); }
+.log-online { color: var(--online); }
+
+/* PHASE BANNER */
 .phase-banner {
   background: var(--p1);
   color: #000;
@@ -1086,19 +1042,19 @@ body {
 }
 .player-panel-title {
   font-family: var(--font-title);
-  font-size: clamp(0.42rem, 1.5vw, 0.58rem);
+  font-size: clamp(0.46rem, 1.5vw, 0.62rem);
   letter-spacing: 0.04em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .cards-row { display: flex; flex-wrap: wrap; gap: 3px; }
 
-/* CARDS */
+/* CARDS — slightly bigger */
 .card {
   cursor: pointer;
   background: linear-gradient(150deg, #181828, #101018);
   border: 1px solid var(--border);
-  padding: clamp(3px, 1vw, 5px) clamp(2px, 0.8vw, 4px);
-  min-width: clamp(38px, 10vw, 52px);
+  padding: clamp(4px, 1vw, 6px) clamp(3px, 0.8vw, 5px);
+  min-width: clamp(42px, 10vw, 56px);
   text-align: center;
   transition: transform 0.1s, border-color 0.15s, background 0.15s, box-shadow 0.15s;
   clip-path: polygon(4px 0%, 100% 0%, calc(100% - 4px) 100%, 0% 100%);
@@ -1125,8 +1081,8 @@ body {
 .card.online-hidden { opacity: 0.07; pointer-events: none; filter: blur(2px); }
 
 .card-emoji { display: none; }
-.card-name  { font-family: var(--font-title); font-size: clamp(0.36rem, 1.1vw, 0.5rem); letter-spacing: 0.02em; color: var(--text); line-height: 1.1; }
-.card-stats { font-family: var(--font-mono); font-size: clamp(0.33rem, 0.95vw, 0.44rem); color: var(--muted); margin-top: 2px; line-height: 1.25; }
+.card-name  { font-family: var(--font-title); font-size: clamp(0.42rem, 1.1vw, 0.56rem); letter-spacing: 0.02em; color: var(--text); line-height: 1.1; }
+.card-stats { font-family: var(--font-mono); font-size: clamp(0.35rem, 0.95vw, 0.46rem); color: var(--muted); margin-top: 2px; line-height: 1.3; }
 .card-stats .stat-dmg  { color: var(--p2); }
 .card-stats .stat-heal { color: #2ecc71; }
 .card-stats .stat-def  { color: var(--accent); }
@@ -1287,22 +1243,28 @@ body {
 /* =============================================
    RESPONSIVE
    ============================================= */
-
 @media (min-width: 580px) {
   body { padding: 20px; }
   .console-shell { width: min(560px, 92vw); }
   .console-screen { height: clamp(320px, 52dvh, 500px); }
   .nds-info-screen { height: clamp(70px, 12dvh, 110px); }
   .card { min-width: 50px; padding: 5px; }
-  .card-emoji { display: none; }
-  .card-name  { font-size: 0.5rem; }
-  .card-stats { font-size: 0.45rem; }
+  .card-name  { font-size: 0.52rem; }
+  .card-stats { font-size: 0.46rem; }
+  .fighter-sprite {
+    width: clamp(110px, 22vw, 150px);
+    height: clamp(145px, 28vw, 200px);
+  }
 }
 
 @media (min-width: 800px) {
   body { padding: 28px; }
   .console-shell { width: min(580px, 62vw); }
   .console-screen { height: clamp(340px, 54dvh, 560px); }
+  .fighter-sprite {
+    width: clamp(120px, 22vw, 160px);
+    height: clamp(158px, 28vw, 215px);
+  }
 }
 
 @media (min-width: 1024px) {
@@ -1364,54 +1326,39 @@ body {
   .nds-info-screen { height: clamp(50px, 9dvh, 80px); }
   .card { padding: 2px 3px; }
   .poke-dialog { min-height: 34px; padding: 4px 8px; }
+  .fighter-sprite {
+    width: clamp(70px, 14vw, 100px);
+    height: clamp(95px, 18vw, 135px);
+  }
 }
 
 @media (max-width: 340px) {
   body { padding: 4px; }
   .card { min-width: 34px; padding: 2px 2px; }
-  .card-emoji { display: none; }
   .card-name  { font-size: 0.33rem; }
   .card-stats { font-size: 0.3rem; }
   .nds-controls { padding: 6px 10px 10px; }
+  .fighter-sprite {
+    width: clamp(80px, 22vw, 110px);
+    height: clamp(108px, 28vw, 148px);
+  }
 }
 
-/* Accuracy line on cards */
-.card-acc-line {
-  margin-top: 2px;
-}
- 
+/* Accuracy */
+.card-acc-line { margin-top: 2px; }
 .stat-acc {
   font-family: var(--font-mono);
   font-size: clamp(0.28rem, 0.85vw, 0.38rem);
   font-weight: 700;
   letter-spacing: 0.03em;
-  padding: 1px 3px;
-  border-radius: 2px;
 }
- 
-/* Green — high accuracy (80-100%) */
-.stat-acc.acc-high {
-  color: #2ecc71;
-}
- 
-/* Yellow — medium accuracy (40-79%) */
-.stat-acc.acc-mid {
-  color: #f7c948;
-}
- 
-/* Red — low accuracy (1-39%) */
-.stat-acc.acc-low {
+.stat-acc.acc-high { color: #2ecc71; }
+.stat-acc.acc-mid  { color: #f7c948; }
+.stat-acc.acc-low  {
   color: #e03c3c;
   animation: accWarn 0.8s ease-in-out infinite alternate;
 }
- 
 @keyframes accWarn {
   from { opacity: 0.6; }
   to   { opacity: 1; box-shadow: 0 0 5px rgba(224,60,60,0.4); }
-}
-
-.arena-bottom-log {
-  width: 100%;
-  flex-shrink: 0;
-  padding: 0 10px 6px;
 }
