@@ -13,7 +13,6 @@
 //     - Quick ATK displays ACC:120% (raw, uncapped)
 //     - Counter floating number shows -N (e.g. -4) not ×N
 //     - ACC merged inline with stats line on cards
-//     - Online multiplayer: retry ping loop, no stacked delays
 // ============================================
 
 // ─── SUPABASE CONFIG ───────────────────────
@@ -40,15 +39,18 @@ const MOVES = {
 const MOVE_KEYS = Object.keys(MOVES);
 
 // ===== ACCURACY SYSTEM =====
+// Raw accuracy values — QUICK_ATK is 1.20 (120%) so future debuffs can reduce it.
+// Anything >= 1.0 always hits in rollAccuracy(), but we display the raw % on cards.
 const MOVE_ACCURACY = {
   ATK:       1.00,
-  QUICK_ATK: 1.20,
+  QUICK_ATK: 1.20,   // displays as 120%; still always hits until debuffed below 100%
   HEAVY_ATK: 0.80,
-  BLOCK:     1.00,
+  BLOCK:     1.00,   // overridden by streak logic
   COUNTER:   1.00,
   HEAL:      1.00,
 };
 
+// Block accuracy per consecutive-block streak (0-indexed)
 const BLOCK_ACC_STEPS = [1.00, 0.80, 0.50, 0.10, 0.01];
 
 function getBlockAccuracy(streak) {
@@ -60,11 +62,13 @@ function getMoveAccuracy(player, moveKey) {
   return MOVE_ACCURACY[moveKey] || 1.0;
 }
 
+// Hit roll: values >= 1.0 always hit; below 1.0 are probabilistic
 function rollAccuracy(player, moveKey) {
   const acc = getMoveAccuracy(player, moveKey);
   return acc >= 1.0 ? true : Math.random() < acc;
 }
 
+// Display the raw percentage (can be > 100%)
 function getAccPct(player, moveKey) {
   return Math.round(getMoveAccuracy(player, moveKey) * 100);
 }
@@ -79,7 +83,6 @@ let onlineChannel = null;
 let onlinePendingMoves = {};
 let onlineOpponentConnected = false;
 let onlineJoinTimeout = null;
-let pingRetryInterval = null;   // NEW: retry loop for p2 pinging
 
 // ===== GAME STATE =====
 let state = {
@@ -91,6 +94,7 @@ let state = {
   p2LastMove: null,
 };
 
+// Track per-round block hit results for sequential turn defence calculation
 let roundBlockHit = { p1: null, p2: null };
 let roundHitResult = { p1: null, p2: null };
 
@@ -191,84 +195,49 @@ function showRoomStatus(msg, type = 'waiting') {
   els.roomStatus.classList.remove('hidden');
 }
 
-// ===== ONLINE: CREATE ROOM =====
 async function createOnlineRoom() {
   const code = generateRoomCode();
-  onlineRoom = code;
-  onlineRole = 'p1';
+  onlineRoom = code; onlineRole = 'p1';
   showRoomStatus(`ROOM: ${code} — Share this code!`, 'waiting');
   await subscribeToRoom(code);
-  // p1 just waits — no ping needed, p2 will initiate
 }
 
-// ===== ONLINE: JOIN ROOM =====
-// FIX: subscribe first, THEN start pinging in a loop every 400ms.
-// Stop as soon as pong arrives. Timeout after 8s total.
 async function joinOnlineRoom(code) {
   code = code.toUpperCase().trim();
   showRoomStatus(`Connecting to ${code}...`, 'waiting');
-  onlineRoom = code;
-  onlineRole = 'p2';
-
+  onlineRoom = code; onlineRole = 'p2';
   await subscribeToRoom(code);
-
-  // Start retry ping loop immediately after subscribe
-  let pingCount = 0;
-  const MAX_PINGS = 20; // 20 × 400ms = 8s timeout
-
-  pingRetryInterval = setInterval(() => {
-    if (onlineOpponentConnected) {
-      clearInterval(pingRetryInterval);
-      pingRetryInterval = null;
-      return;
-    }
-    if (pingCount >= MAX_PINGS) {
-      clearInterval(pingRetryInterval);
-      pingRetryInterval = null;
+  setTimeout(() => sendOnlineEvent('ping', { role: 'p2' }), 600);
+  onlineJoinTimeout = setTimeout(() => {
+    if (!onlineOpponentConnected) {
       showRoomStatus(`Room "${code}" not found or host left!`, 'error');
       leaveOnlineRoom();
-      return;
     }
-    sendOnlineEvent('ping', { role: 'p2' });
-    pingCount++;
-  }, 400);
+  }, 5000);
 }
 
-// ===== SUBSCRIBE TO ROOM =====
 function subscribeToRoom(code) {
   return new Promise((resolve) => {
     if (onlineChannel) { onlineChannel.unsubscribe(); onlineChannel = null; }
-
     onlineChannel = supabaseClient.channel(`brawl:${code}`, {
       config: { broadcast: { self: false, ack: false } }
     });
-
     onlineChannel
-      // p1 receives ping → reply pong immediately, then start game
       .on('broadcast', { event: 'ping' }, () => {
         if (onlineRole !== 'p1') return;
-        if (onlineOpponentConnected) return; // ignore duplicate pings
         onlineOpponentConnected = true;
-        showRoomStatus('Opponent connected! Starting...', 'connected');
-        sendOnlineEvent('pong', {});
-        // Start game right away — no delay needed
-        gameMode = 'online';
-        startGame();
-        showScreen('game');
+        clearTimeout(onlineJoinTimeout);
+        showRoomStatus(`Opponent connected! Starting...`, 'connected');
+        setTimeout(() => { sendOnlineEvent('pong', {}); gameMode = 'online'; startGame(); showScreen('game'); }, 600);
       })
-      // p2 receives pong → stop pinging, start game
       .on('broadcast', { event: 'pong' }, () => {
         if (onlineRole !== 'p2') return;
-        if (onlineOpponentConnected) return; // ignore duplicate pongs
         onlineOpponentConnected = true;
-        clearInterval(pingRetryInterval);
-        pingRetryInterval = null;
-        showRoomStatus('Connected! Starting...', 'connected');
-        gameMode = 'online';
-        startGame();
-        showScreen('game');
+        clearTimeout(onlineJoinTimeout);
+        showRoomStatus(`Connected! Starting...`, 'connected');
+        setTimeout(() => { gameMode = 'online'; startGame(); showScreen('game'); }, 600);
       })
-      .on('broadcast', { event: 'move' }, ({ payload }) => { handleOnlineMove(payload.role, payload.move, payload.hitRoll); })
+      .on('broadcast', { event: 'move' }, ({ payload }) => { handleOnlineMove(payload.role, payload.move); })
       .on('broadcast', { event: 'rematch' }, () => { startGame(); showScreen('game'); })
       .subscribe((status) => { if (status === 'SUBSCRIBED') resolve(); });
   });
@@ -279,20 +248,15 @@ function sendOnlineEvent(event, payload) {
   onlineChannel.send({ type: 'broadcast', event, payload });
 }
 
-function handleOnlineMove(role, moveKey, hitRoll) {
-  onlinePendingMoves[role] = { move: moveKey, hitRoll };
+function handleOnlineMove(role, moveKey) {
+  onlinePendingMoves[role] = moveKey;
   if (role !== onlineRole) {
     els.p2SelDisp.textContent = '✓ OPPONENT LOCKED IN';
     els.p2SelDisp.style.color = 'var(--online)';
   }
   if (onlinePendingMoves.p1 && onlinePendingMoves.p2) {
-    state.p1.move = onlinePendingMoves.p1.move;
-    state.p2.move = onlinePendingMoves.p2.move;
-    // Store pre-rolled hit results so both devices use identical values
-    state._onlineHitRolls = {
-      p1: onlinePendingMoves.p1.hitRoll,
-      p2: onlinePendingMoves.p2.hitRoll,
-    };
+    state.p1.move = onlinePendingMoves.p1;
+    state.p2.move = onlinePendingMoves.p2;
     onlinePendingMoves = {};
     els.onlineWaiting.classList.add('hidden');
     showBothPanels();
@@ -302,14 +266,9 @@ function handleOnlineMove(role, moveKey, hitRoll) {
 }
 
 function leaveOnlineRoom() {
-  clearInterval(pingRetryInterval);
-  pingRetryInterval = null;
   clearTimeout(onlineJoinTimeout);
   if (onlineChannel) { onlineChannel.unsubscribe(); onlineChannel = null; }
-  onlineRoom = null;
-  onlineRole = null;
-  onlinePendingMoves = {};
-  onlineOpponentConnected = false;
+  onlineRoom = null; onlineRole = null; onlinePendingMoves = {}; onlineOpponentConnected = false;
 }
 
 function generateRoomCode() {
@@ -460,6 +419,7 @@ function buildCards(player) {
   });
 }
 
+// ===== STAT LINE (stats + ACC merged) =====
 function buildStatLine(player, key) {
   const move = MOVES[key];
   const parts = [];
@@ -472,6 +432,7 @@ function buildStatLine(player, key) {
   const priSign = move.priority >= 0 ? '+' : '';
   parts.push(`<span>P:${priSign}${move.priority}</span>`);
 
+  // ACC inline — always last
   parts.push(buildAccSpan(player, key));
 
   return parts.join(' ');
@@ -486,10 +447,12 @@ function buildAccSpan(player, key) {
     return `<span class="stat-acc ${cls}">ACC:${pct}%${streakSuffix}</span>`;
   }
   const rawPct = Math.round((MOVE_ACCURACY[key] || 1.0) * 100);
+  // >100% = always hits = green; 85-99 = yellow; <85 = red
   const cls = rawPct >= 100 ? 'acc-high' : rawPct >= 85 ? 'acc-mid' : 'acc-low';
   return `<span class="stat-acc ${cls}">ACC:${rawPct}%</span>`;
 }
 
+// Refresh stats line for all cards of a player (e.g. after block streak changes)
 function refreshAccDisplay(player) {
   const container = player === 'p1' ? els.p1Cards : els.p2Cards;
   container.querySelectorAll('.card').forEach(card => {
@@ -514,15 +477,12 @@ function selectMove(player, moveKey, cardEl) {
     dispEl.textContent = `✓ ${MOVES[moveKey].name}`;
     dispEl.style.color = player === 'p1' ? 'var(--p1)' : 'var(--p2)';
     lockCards(player);
-    const myHitRoll = rollAccuracy(player, moveKey);
-    sendOnlineEvent('move', { role: onlineRole, move: moveKey, hitRoll: myHitRoll });
-    onlinePendingMoves[onlineRole] = { move: moveKey, hitRoll: myHitRoll };
+    sendOnlineEvent('move', { role: onlineRole, move: moveKey });
+    onlinePendingMoves[onlineRole] = moveKey;
     els.onlineWaiting.classList.remove('hidden');
     els.phaseBanner.classList.add('hidden');
     if (onlinePendingMoves.p1 && onlinePendingMoves.p2) {
-      state.p1.move = onlinePendingMoves.p1.move;
-      state.p2.move = onlinePendingMoves.p2.move;
-      state._onlineHitRolls = { p1: onlinePendingMoves.p1.hitRoll, p2: onlinePendingMoves.p2.hitRoll };
+      state.p1.move = onlinePendingMoves.p1; state.p2.move = onlinePendingMoves.p2;
       onlinePendingMoves = {};
       els.onlineWaiting.classList.add('hidden');
       showBothPanels(); state.phase = 'both-chosen';
@@ -715,17 +675,13 @@ async function resolveRound() {
   logEntry(`— ROUND ${state.round} —`, 'log-info');
   logEntry(`P1: ${m1.name}  |  ${p2Label}: ${m2.name}`, 'log-info');
 
-  // Online: use pre-rolled values sent with each player's move so both devices are in sync
-  const p1Hit = (gameMode === 'online' && state._onlineHitRolls)
-    ? state._onlineHitRolls.p1
-    : rollAccuracy('p1', state.p1.move);
-  const p2Hit = (gameMode === 'online' && state._onlineHitRolls)
-    ? state._onlineHitRolls.p2
-    : rollAccuracy('p2', state.p2.move);
-  state._onlineHitRolls = null;
+  // ===== ROLL ACCURACY =====
+  const p1Hit = rollAccuracy('p1', state.p1.move);
+  const p2Hit = rollAccuracy('p2', state.p2.move);
   roundHitResult.p1 = p1Hit;
   roundHitResult.p2 = p2Hit;
 
+  // Store block hit results for sequential-turn defence checks
   roundBlockHit.p1 = (state.p1.move === 'BLOCK') ? p1Hit : null;
   roundBlockHit.p2 = (state.p2.move === 'BLOCK') ? p2Hit : null;
 
@@ -733,6 +689,7 @@ async function resolveRound() {
   const p2Pct = getAccPct('p2', state.p2.move);
   logEntry(`P1 ACC:${p1Pct}% → ${p1Hit ? 'HIT' : 'MISS'} | ${p2Label} ACC:${p2Pct}% → ${p2Hit ? 'HIT' : 'MISS'}`, 'log-info');
 
+  // ===== UPDATE BLOCK STREAKS =====
   updateBlockStreak('p1', state.p1.move, p1Hit);
   updateBlockStreak('p2', state.p2.move, p2Hit);
 
@@ -768,6 +725,7 @@ async function resolveRound() {
   setPhase('p1-choose');
 }
 
+// ===== BLOCK STREAK TRACKING =====
 function updateBlockStreak(player, moveKey, hit) {
   if (moveKey === 'BLOCK') {
     if (hit) state[player].blockStreak++;
@@ -777,6 +735,7 @@ function updateBlockStreak(player, moveKey, hit) {
   }
 }
 
+// ===== SIMULTANEOUS TURNS =====
 async function applySimultaneous(m1, m2, p1Hit = true, p2Hit = true) {
   spawnClashText(m1.name, m2.name);
   await delay(600);
@@ -785,6 +744,7 @@ async function applySimultaneous(m1, m2, p1Hit = true, p2Hit = true) {
   const heal1   = (p1Hit && m1.heal) ? m1.heal : 0;
   const heal2   = (p2Hit && m2.heal) ? m2.heal : 0;
 
+  // Block only reduces damage if it SUCCEEDED (hit)
   const def2 = (p2Hit && m2.defence) ? m2.defence : 0;
   const def1 = (p1Hit && m1.defence) ? m1.defence : 0;
 
@@ -804,14 +764,17 @@ async function applySimultaneous(m1, m2, p1Hit = true, p2Hit = true) {
   updateHUD();
 }
 
+// ===== SINGLE TURN =====
 async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = false, hit = true) {
   const p2Label = gameMode === 'online' ? 'Opponent' : gameMode !== '2p' ? 'CPU' : 'P2';
   const attackerLabel = attacker === 'p1' ? 'Player 1' : p2Label;
   const defenderLabel = defender === 'p1' ? 'Player 1' : p2Label;
 
+  // ── MISS ──
   if (!hit) {
     let missMsg;
     if (atkMove.name === 'BLOCK') {
+      // Block failed: clear warning message, no defence this round
       missMsg = `${attackerLabel}'s BLOCK FAILED!\nToo tired to hold guard!\nTaking full damage — streak reset!`;
     } else if (atkMove.name === 'HEAL') {
       missMsg = `${attackerLabel}'s HEAL fizzled!\nConcentration broken — no HP restored!`;
@@ -823,9 +786,12 @@ async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = fa
     return;
   }
 
+  // ── HIT ──
   const dmg = calcDamage(attacker, atkMove, defender, defMove);
   const heal = atkMove.heal || 0;
 
+  // Defence from defender's block only applies if defender's block HIT this round.
+  // We check roundBlockHit[defender] — null means they didn't use block, true/false = hit/miss.
   const defenderBlockHit = roundBlockHit[defender];
   const defenderDef = (defMove.defence > 0 && defenderBlockHit === true) ? defMove.defence : 0;
   const actualDmg = Math.max(0, dmg - defenderDef);
@@ -844,10 +810,10 @@ async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = fa
     const isQuickAtk = defMove.name === 'QUICK ATK';
     if (isQuickAtk) {
       await showDialog(`${attackerLabel}'s COUNTER failed!\n${defenderLabel}'s QUICK ATK was too fast!`, 2000);
-    } else if (!isDefenderAttacking) {
-      await showDialog(`${attackerLabel}'s COUNTER failed!\nNo attack to reflect — turn wasted!`, 2000);
+   } else if (!isDefenderAttacking) {
+  await showDialog(`${attackerLabel}'s COUNTER failed!\nNo attack to reflect — turn wasted!`, 2000);
     } else if (!roundHitResult[defender]) {
-      await showDialog(`${attackerLabel}'s COUNTER failed!\n${defenderLabel}'s attack missed — no damage to reflect!`, 2000);
+  await showDialog(`${attackerLabel}'s COUNTER failed!\n${defenderLabel}'s attack missed — no damage to reflect!`, 2000);
     } else {
       await showDialog(`${attackerLabel}'s COUNTER activated!\nReflecting ${actualDmg} damage back!`, 2000);
     }
@@ -865,6 +831,7 @@ async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = fa
   updateHUD();
 }
 
+// ===== MISS ANIMATION =====
 async function animateMiss(attacker, atkMove) {
   const atkSprite = attacker === 'p1' ? els.p1Sprite : els.p2Sprite;
   atkSprite.style.transition = 'transform 120ms ease';
@@ -893,6 +860,7 @@ function spawnClashText(move1, move2) {
   const cy = rect.top + rect.height / 2;
   const isMobile = window.innerWidth < 480;
 
+  // First: CLASH!
   const el1 = document.createElement('div');
   el1.style.cssText = `
     position:fixed;
@@ -911,6 +879,7 @@ function spawnClashText(move1, move2) {
   document.body.appendChild(el1);
   setTimeout(() => el1.remove(), 1100);
 
+  // Second: move vs move (delayed)
   setTimeout(() => {
     const el2 = document.createElement('div');
     el2.style.cssText = `
@@ -931,7 +900,6 @@ function spawnClashText(move1, move2) {
     setTimeout(() => el2.remove(), 1100);
   }, 320);
 }
-
 function spawnMissText(target, label = 'MISS!') {
   const sprite = target === 'p1' ? els.p1Sprite : els.p2Sprite;
   const rect = sprite.getBoundingClientRect();
@@ -954,6 +922,7 @@ function spawnMissText(target, label = 'MISS!') {
   setTimeout(() => el.remove(), 900);
 }
 
+// ===== DAMAGE CALC =====
 function calcDamage(attacker, atkMove, defender, defMove) {
   if (atkMove.name === 'COUNTER') {
     if (defMove.name === 'QUICK ATK') {
@@ -966,13 +935,13 @@ function calcDamage(attacker, atkMove, defender, defMove) {
       return 0;
     }
     const defenderHit = roundHitResult[defender];
-    if (!defenderHit) {
-      logEntry(`${attacker.toUpperCase()} COUNTER — attack missed, nothing to reflect!`, 'log-info');
-      return 0;
-    }
-    const defDmg = defMove.dmg || 0;
-    logEntry(`${attacker.toUpperCase()} COUNTERS — reflects ${defDmg * 2} dmg!`, 'log-dmg');
-    return defDmg * 2;
+if (!defenderHit) {
+  logEntry(`${attacker.toUpperCase()} COUNTER — attack missed, nothing to reflect!`, 'log-info');
+  return 0;
+}
+const defDmg = defMove.dmg || 0;
+logEntry(`${attacker.toUpperCase()} COUNTERS — reflects ${defDmg * 2} dmg!`, 'log-dmg');
+return defDmg * 2;
   }
   return atkMove.dmg || 0;
 }
@@ -982,6 +951,7 @@ function applyDamage(target, amount, source, srcMove) {
   state[target].hp = Math.max(0, state[target].hp - amount);
   const p2Label = gameMode === 'online' ? 'OPP' : gameMode !== '2p' ? 'CPU' : 'P2';
   logEntry(`${source === 'p2' ? p2Label : 'P1'} hits ${target === 'p2' ? p2Label : 'P1'} for ${amount} dmg!`, 'log-dmg');
+  // Counter shows as negative damage number (same colour purple, but -N not ×N)
   const isCounter = srcMove && srcMove.name === 'COUNTER';
   spawnDamageNumber(target, amount, isCounter ? 'counter' : 'dmg');
 }
@@ -1244,11 +1214,13 @@ function flashHitCinematic(player, color) {
   });
 }
 
+// ===== FLOATING NUMBERS =====
 function spawnDamageNumber(target, amount, type = 'dmg') {
   const sprite = target === 'p1' ? els.p1Sprite : els.p2Sprite;
   const rect = sprite.getBoundingClientRect();
   const el = document.createElement('div');
   const colors = { dmg: '#ff4444', heal: '#2ecc71', counter: '#b04aff' };
+  // Counter now shows -N (actual negative damage) instead of ×N
   const symbols = { dmg: `-${amount}`, heal: `+${amount}`, counter: `-${amount}` };
   const isMobile = window.innerWidth < 480;
   el.style.cssText = `
