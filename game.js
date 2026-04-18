@@ -528,6 +528,30 @@ function hideSuddenDeathOverlay() {
   setTimeout(() => els.sdOverlay.classList.add('hidden'), 400);
 }
 
+function showTiedOverlay() {
+  if (!els.sdOverlay) return;
+  els.sdOverlay.querySelector('.sd-skull').textContent = '⚔️';
+  els.sdOverlay.querySelector('.sd-title').textContent = 'STILL TIED!';
+  els.sdOverlay.querySelector('.sd-sub').textContent = 'Neither fighter falls...\nAnother round begins!';
+  els.sdOverlay.querySelector('.sd-rule-row').style.display = 'none';
+  els.sdOverlay.querySelector('.sd-quick-note').style.display = 'none';
+  els.sdOverlay.classList.remove('hidden');
+  els.sdOverlay.classList.add('active');
+}
+
+function hideTiedOverlay() {
+  if (!els.sdOverlay) return;
+  els.sdOverlay.classList.remove('active');
+  setTimeout(() => {
+    els.sdOverlay.classList.add('hidden');
+    els.sdOverlay.querySelector('.sd-skull').textContent = '💀';
+    els.sdOverlay.querySelector('.sd-title').textContent = 'SUDDEN DEATH';
+    els.sdOverlay.querySelector('.sd-sub').textContent = 'Time is up. One final round.\nHighest HP after resolve wins.';
+    els.sdOverlay.querySelector('.sd-rule-row').style.display = '';
+    els.sdOverlay.querySelector('.sd-quick-note').style.display = '';
+  }, 400);
+}
+
 // ===== GAME INIT =====
 function startGame() {
   state = {
@@ -1075,7 +1099,9 @@ async function resolveRound() {
     if (state.p1.hp < state.p2.hp) state.p1.hp = 0;
     else if (state.p2.hp < state.p1.hp) state.p2.hp = 0;
     else {
-      // Still tied — keep going, another sudden death round
+      showTiedOverlay();
+      await delay(3000);
+      hideTiedOverlay();
       state.round++;
       els.roundNum.textContent = state.round;
       await delay(200);
