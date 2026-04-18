@@ -1,9 +1,13 @@
 // ============================================
 //   BRAWL CARDS — game.js
-//   • Local 2P, CPU modes (unchanged)
+//   • Local 2P, CPU modes
 //   • Online multiplayer via Supabase Realtime
 //   • Mobile-responsive fixes
 //   • Card sprite support (p1.png / p2.png)
+//   • ACCURACY SYSTEM ADDED
+//     ATK=100%, QUICK ATK=120%, HEAVY ATK=80%
+//     BLOCK degrades: 100/80/50/10/1% per streak
+//     COUNTER & HEAL = always 100%
 // ============================================
 
 // ─── SUPABASE CONFIG ───────────────────────
@@ -22,12 +26,44 @@ const MOVES = {
   ATK:       { name: 'ATK',       dmg: 2,    priority: 0,  heal: 0, defence: 0, label: 'DMG:2 | PRI:0',   emoji: '👊', desc: 'A solid straight punch! Deals 2 damage!' },
   QUICK_ATK: { name: 'QUICK ATK', dmg: 1,    priority: 1,  heal: 0, defence: 0, label: 'DMG:1 | PRI:+1',  emoji: '⚡', desc: 'Lightning-fast jab! Goes first — and CANNOT be countered!' },
   HEAVY_ATK: { name: 'HEAVY ATK', dmg: 4,    priority: -1, heal: 0, defence: 0, label: 'DMG:4 | PRI:-1',  emoji: '💥', desc: 'A bone-crushing blow! Deals 4 damage but goes last!' },
-  BLOCK:     { name: 'BLOCK',     dmg: 0,    priority: 2,  heal: 0, defence: 2, label: 'DEF:2 | PRI:+2',  emoji: '🛡️', desc: 'Raises guard! Reduces incoming damage by 2!' },
+  BLOCK:     { name: 'BLOCK',     dmg: 0,    priority: 2,  heal: 0, defence: 2, label: 'DEF:2 | PRI:+2',  emoji: '🛡️', desc: 'Raises guard! Reduces incoming damage by 2! Accuracy drops with repeated use.' },
   COUNTER:   { name: 'COUNTER',   dmg: 'x2', priority: -2, heal: 0, defence: 0, label: 'DMG:×2 | PRI:-2', emoji: '🔄', desc: 'Reflects enemy attack back DOUBLED! Fails vs Quick ATK!' },
   HEAL:      { name: 'HEAL',      dmg: 0,    priority: 2,  heal: 6, defence: 0, label: '+6HP | PRI:+2',   emoji: '💚', desc: 'Recovers 6 HP! But max HP drops by 2...' },
 };
 
 const MOVE_KEYS = Object.keys(MOVES);
+
+// ===== ACCURACY SYSTEM =====
+// Base accuracy per move. QUICK_ATK > 1.0 so it always hits (capped at 100%)
+const MOVE_ACCURACY = {
+  ATK:       1.00,
+  QUICK_ATK: 1.20,
+  HEAVY_ATK: 0.80,
+  BLOCK:     1.00, // overridden by streak logic below
+  COUNTER:   1.00,
+  HEAL:      1.00,
+};
+
+// Block acc per consecutive-block streak (0-indexed: 0=1st use, 1=2nd use, etc.)
+const BLOCK_ACC_STEPS = [1.00, 0.80, 0.50, 0.10, 0.01];
+
+function getBlockAccuracy(streak) {
+  const idx = Math.min(streak, BLOCK_ACC_STEPS.length - 1);
+  return BLOCK_ACC_STEPS[idx];
+}
+
+function getMoveAccuracy(player, moveKey) {
+  if (moveKey === 'BLOCK') return getBlockAccuracy(state[player].blockStreak);
+  return Math.min(1.0, MOVE_ACCURACY[moveKey] || 1.0);
+}
+
+function rollAccuracy(player, moveKey) {
+  return Math.random() < getMoveAccuracy(player, moveKey);
+}
+
+function getAccPct(player, moveKey) {
+  return Math.round(getMoveAccuracy(player, moveKey) * 100);
+}
 
 // ===== GAME CONFIG =====
 let gameMode = '2p';
@@ -42,8 +78,8 @@ let onlineJoinTimeout = null;
 
 // ===== GAME STATE =====
 let state = {
-  p1: { hp: 10, maxHp: 10, move: null },
-  p2: { hp: 10, maxHp: 10, move: null },
+  p1: { hp: 10, maxHp: 10, move: null, blockStreak: 0 },
+  p2: { hp: 10, maxHp: 10, move: null, blockStreak: 0 },
   round: 1,
   phase: 'p1-choose',
   p1MoveHistory: [],
@@ -96,7 +132,6 @@ const els = {
   roomStatus:     document.getElementById('room-status'),
 };
 
-// Helper to update card label text on the fighter card sprites
 function setCardLabel(spriteEl, text) {
   const label = spriteEl.querySelector('.card-label');
   if (label) label.textContent = text;
@@ -109,45 +144,28 @@ function showScreen(name) {
   if (name === 'title') screens.title.scrollTop = 0;
 }
 
-// ===== TITLE SCREEN BUTTONS =====
+// ===== TITLE BUTTONS =====
 document.getElementById('btn-start').addEventListener('click', () => {
-  gameMode = '2p';
-  startGame();
-  showScreen('game');
+  gameMode = '2p'; startGame(); showScreen('game');
 });
-
 document.querySelectorAll('.btn-difficulty').forEach(btn => {
   btn.addEventListener('click', () => {
-    gameMode = btn.dataset.diff;
-    startGame();
-    showScreen('game');
+    gameMode = btn.dataset.diff; startGame(); showScreen('game');
   });
 });
-
 document.getElementById('btn-rules').addEventListener('click', () => showScreen('rules'));
 document.getElementById('btn-rules-back').addEventListener('click', () => showScreen('title'));
-document.getElementById('btn-title').addEventListener('click', () => {
-  leaveOnlineRoom();
-  showScreen('title');
-});
+document.getElementById('btn-title').addEventListener('click', () => { leaveOnlineRoom(); showScreen('title'); });
 document.getElementById('btn-rematch').addEventListener('click', () => {
-  if (gameMode === 'online') {
-    sendOnlineEvent('rematch', {});
-    startGame();
-    showScreen('game');
-  } else {
-    startGame();
-    showScreen('game');
-  }
+  if (gameMode === 'online') { sendOnlineEvent('rematch', {}); }
+  startGame(); showScreen('game');
 });
 
 // ===== ONLINE ROOM UI =====
 els.btnCreateRoom.addEventListener('click', createOnlineRoom);
 els.btnJoinRoom.addEventListener('click', () => {
   els.joinInputWrap.classList.toggle('hidden');
-  if (!els.joinInputWrap.classList.contains('hidden')) {
-    setTimeout(() => els.joinCodeInput.focus(), 100);
-  }
+  if (!els.joinInputWrap.classList.contains('hidden')) setTimeout(() => els.joinCodeInput.focus(), 100);
 });
 els.btnJoinConfirm.addEventListener('click', () => {
   const code = els.joinCodeInput.value.trim().toUpperCase();
@@ -165,21 +183,17 @@ function showRoomStatus(msg, type = 'waiting') {
   els.roomStatus.classList.remove('hidden');
 }
 
-// ===== CREATE ROOM =====
 async function createOnlineRoom() {
   const code = generateRoomCode();
-  onlineRoom = code;
-  onlineRole = 'p1';
+  onlineRoom = code; onlineRole = 'p1';
   showRoomStatus(`ROOM: ${code} — Share this code!`, 'waiting');
   await subscribeToRoom(code);
 }
 
-// ===== JOIN ROOM =====
 async function joinOnlineRoom(code) {
   code = code.toUpperCase().trim();
   showRoomStatus(`Connecting to ${code}...`, 'waiting');
-  onlineRoom = code;
-  onlineRole = 'p2';
+  onlineRoom = code; onlineRole = 'p2';
   await subscribeToRoom(code);
   setTimeout(() => sendOnlineEvent('ping', { role: 'p2' }), 600);
   onlineJoinTimeout = setTimeout(() => {
@@ -190,7 +204,6 @@ async function joinOnlineRoom(code) {
   }, 5000);
 }
 
-// ===== SUBSCRIBE TO ROOM =====
 function subscribeToRoom(code) {
   return new Promise((resolve) => {
     if (onlineChannel) { onlineChannel.unsubscribe(); onlineChannel = null; }
@@ -203,12 +216,7 @@ function subscribeToRoom(code) {
         onlineOpponentConnected = true;
         clearTimeout(onlineJoinTimeout);
         showRoomStatus(`Opponent connected! Starting...`, 'connected');
-        setTimeout(() => {
-          sendOnlineEvent('pong', {});
-          gameMode = 'online';
-          startGame();
-          showScreen('game');
-        }, 600);
+        setTimeout(() => { sendOnlineEvent('pong', {}); gameMode = 'online'; startGame(); showScreen('game'); }, 600);
       })
       .on('broadcast', { event: 'pong' }, () => {
         if (onlineRole !== 'p2') return;
@@ -248,10 +256,7 @@ function handleOnlineMove(role, moveKey) {
 function leaveOnlineRoom() {
   clearTimeout(onlineJoinTimeout);
   if (onlineChannel) { onlineChannel.unsubscribe(); onlineChannel = null; }
-  onlineRoom = null;
-  onlineRole = null;
-  onlinePendingMoves = {};
-  onlineOpponentConnected = false;
+  onlineRoom = null; onlineRole = null; onlinePendingMoves = {}; onlineOpponentConnected = false;
 }
 
 function generateRoomCode() {
@@ -264,8 +269,8 @@ function generateRoomCode() {
 // ===== GAME INIT =====
 function startGame() {
   state = {
-    p1: { hp: 10, maxHp: 10, move: null },
-    p2: { hp: 10, maxHp: 10, move: null },
+    p1: { hp: 10, maxHp: 10, move: null, blockStreak: 0 },
+    p2: { hp: 10, maxHp: 10, move: null, blockStreak: 0 },
     round: 1,
     phase: 'p1-choose',
     p1MoveHistory: [],
@@ -285,64 +290,51 @@ function updateModeUI() {
   const isAI = ['easy', 'medium', 'hard'].includes(gameMode);
   const isOnline = gameMode === 'online';
   const isMobile = window.innerWidth < 400;
-
   const setTitle = (el, text, color = '') => { if (el) { el.textContent = text; el.style.color = color; } };
 
   if (isAI) {
     const label = gameMode === 'easy' ? 'CPU EASY' : gameMode === 'medium' ? 'CPU MEDIUM' : 'CPU HARD';
     const shortLabel = gameMode === 'easy' ? 'CPU — EASY' : gameMode === 'medium' ? 'CPU — MED' : 'CPU — HARD';
-    els.p1Name.textContent = 'PLAYER 1';
-    els.p1Name.className = 'fighter-name p1-color';
-    els.p2Name.textContent = isMobile ? shortLabel : label;
-    els.p2Name.className = 'fighter-name cpu-color';
+    els.p1Name.textContent = 'PLAYER 1'; els.p1Name.className = 'fighter-name p1-color';
+    els.p2Name.textContent = isMobile ? shortLabel : label; els.p2Name.className = 'fighter-name cpu-color';
     setTitle(els.p2PanelTitle, isMobile ? '🤖 CPU' : '🤖 CPU — LOCKED IN', 'var(--cpu)');
     setTitle(els.p1PanelTitle, isMobile ? '⚡ P1 — PICK' : '⚡ PLAYER 1 — CHOOSE');
-    els.p2Sprite.classList.add('cpu-sprite');
-    els.p2Sprite.classList.remove('online-sprite');
-    setCardLabel(els.p1Sprite, 'P1');
-    setCardLabel(els.p2Sprite, 'CPU');
+    els.p2Sprite.classList.add('cpu-sprite'); els.p2Sprite.classList.remove('online-sprite');
+    setCardLabel(els.p1Sprite, 'P1'); setCardLabel(els.p2Sprite, 'CPU');
     els.modeBadge.textContent = isMobile ? `VS CPU·${gameMode.toUpperCase()}` : `VS CPU · ${gameMode.toUpperCase()}`;
     els.modeBadge.className = `mode-badge ${gameMode}`;
   } else if (isOnline) {
     const myRole = onlineRole || 'p1';
     els.p1Name.textContent = myRole === 'p1' ? (isMobile ? '⚡ YOU' : '⚡ YOU (P1)') : '⚡ OPP';
     els.p2Name.textContent = myRole === 'p2' ? (isMobile ? '🔥 YOU' : '🔥 YOU (P2)') : '🔥 OPP';
-    els.p1Name.className = 'fighter-name p1-color';
-    els.p2Name.className = 'fighter-name online-color';
+    els.p1Name.className = 'fighter-name p1-color'; els.p2Name.className = 'fighter-name online-color';
     setTitle(els.p2PanelTitle, isMobile ? '🌐 OPP' : '🌐 OPPONENT — CHOOSING', 'var(--online)');
     setTitle(els.p1PanelTitle, isMobile ? '⚡ YOU' : '⚡ YOU — CHOOSE');
-    els.p2Sprite.classList.remove('cpu-sprite');
-    els.p2Sprite.classList.add('online-sprite');
+    els.p2Sprite.classList.remove('cpu-sprite'); els.p2Sprite.classList.add('online-sprite');
     setCardLabel(els.p1Sprite, myRole === 'p1' ? 'YOU' : 'OPP');
     setCardLabel(els.p2Sprite, myRole === 'p2' ? 'YOU' : 'OPP');
     els.modeBadge.textContent = isMobile ? `RM:${onlineRoom}` : `ONLINE · ROOM ${onlineRoom}`;
     els.modeBadge.className = 'mode-badge online';
     applyOnlinePanelLayout();
   } else {
-    els.p1Name.textContent = 'PLAYER 1';
-    els.p1Name.className = 'fighter-name p1-color';
-    els.p2Name.textContent = 'PLAYER 2';
-    els.p2Name.className = 'fighter-name p2-color';
+    els.p1Name.textContent = 'PLAYER 1'; els.p1Name.className = 'fighter-name p1-color';
+    els.p2Name.textContent = 'PLAYER 2'; els.p2Name.className = 'fighter-name p2-color';
     setTitle(els.p2PanelTitle, isMobile ? '🔥 P2 — PICK' : '🔥 PLAYER 2 — CHOOSE');
     setTitle(els.p1PanelTitle, isMobile ? '⚡ P1 — PICK' : '⚡ PLAYER 1 — CHOOSE');
     els.p2Sprite.classList.remove('cpu-sprite', 'online-sprite');
-    setCardLabel(els.p1Sprite, 'P1');
-    setCardLabel(els.p2Sprite, 'P2');
-    els.modeBadge.textContent = '2 PLAYER';
-    els.modeBadge.className = 'mode-badge';
+    setCardLabel(els.p1Sprite, 'P1'); setCardLabel(els.p2Sprite, 'P2');
+    els.modeBadge.textContent = '2 PLAYER'; els.modeBadge.className = 'mode-badge';
   }
 }
 
 function applyOnlinePanelLayout() {
   const myPanel = onlineRole === 'p1' ? els.p1Panel : els.p2Panel;
   const oppPanel = onlineRole === 'p1' ? els.p2Panel : els.p1Panel;
-  myPanel.style.opacity = '1';
-  oppPanel.style.opacity = '0.5';
-  const oppCards = oppPanel.querySelectorAll('.card');
-  oppCards.forEach(c => c.classList.add('online-hidden'));
+  myPanel.style.opacity = '1'; oppPanel.style.opacity = '0.5';
+  oppPanel.querySelectorAll('.card').forEach(c => c.classList.add('online-hidden'));
 }
 
-// ===== POKÉMON DIALOGUE BOX =====
+// ===== POKÉMON DIALOGUE =====
 let dialogQueue = [];
 let isDialogBusy = false;
 
@@ -366,16 +358,14 @@ async function processDialogQueue() {
   }
   if (duration > 0) {
     await delay(duration);
-    resolve();
-    processDialogQueue();
+    resolve(); processDialogQueue();
   } else {
     els.pokeDialogArrow.classList.remove('hidden');
     const next = () => {
       els.pokeDialog.removeEventListener('click', next);
       els.pokeDialog.removeEventListener('touchend', next);
       document.removeEventListener('keydown', next);
-      resolve();
-      processDialogQueue();
+      resolve(); processDialogQueue();
     };
     els.pokeDialog.addEventListener('click', next);
     els.pokeDialog.addEventListener('touchend', next, { passive: true });
@@ -385,8 +375,7 @@ async function processDialogQueue() {
 
 function hideDialog() {
   els.pokeDialog.classList.add('hidden');
-  dialogQueue = [];
-  isDialogBusy = false;
+  dialogQueue = []; isDialogBusy = false;
 }
 
 function setDialogImmediate(text) {
@@ -413,13 +402,41 @@ function buildCards(player) {
     if (move.defence) statLine += `<span class="stat-def">DEF:${move.defence}</span> `;
     statLine += `<span>P:${move.priority >= 0 ? '+' : ''}${move.priority}</span>`;
 
+    // Accuracy indicator
+    const accLine = buildAccLine(player, key);
+
     card.innerHTML = `
       <div class="card-name">${move.name}</div>
       <div class="card-stats">${statLine}</div>
+      <div class="card-acc-line">${accLine}</div>
     `;
     card.addEventListener('click', () => selectMove(player, key, card));
     card.addEventListener('touchend', (e) => { e.preventDefault(); selectMove(player, key, card); }, { passive: false });
     container.appendChild(card);
+  });
+}
+
+function buildAccLine(player, key) {
+  if (key === 'BLOCK') {
+    const streak = state[player].blockStreak;
+    const acc = Math.round(getBlockAccuracy(streak) * 100);
+    const cls = acc >= 80 ? 'acc-high' : acc >= 40 ? 'acc-mid' : 'acc-low';
+    const streakLabel = streak > 0 ? ` ×${streak}` : '';
+    return `<span class="stat-acc ${cls}">ACC:${acc}%${streakLabel}</span>`;
+  }
+  const base = MOVE_ACCURACY[key] || 1.0;
+  const pct = Math.round(Math.min(1.0, base) * 100);
+  const cls = pct >= 100 ? 'acc-high' : pct >= 85 ? 'acc-mid' : 'acc-low';
+  return `<span class="stat-acc ${cls}">ACC:${pct}%</span>`;
+}
+
+// Refresh just the accuracy line on all cards for a player
+function refreshAccDisplay(player) {
+  const container = player === 'p1' ? els.p1Cards : els.p2Cards;
+  container.querySelectorAll('.card').forEach(card => {
+    const key = card.dataset.move;
+    const accEl = card.querySelector('.card-acc-line');
+    if (accEl) accEl.innerHTML = buildAccLine(player, key);
   });
 }
 
@@ -443,12 +460,10 @@ function selectMove(player, moveKey, cardEl) {
     els.onlineWaiting.classList.remove('hidden');
     els.phaseBanner.classList.add('hidden');
     if (onlinePendingMoves.p1 && onlinePendingMoves.p2) {
-      state.p1.move = onlinePendingMoves.p1;
-      state.p2.move = onlinePendingMoves.p2;
+      state.p1.move = onlinePendingMoves.p1; state.p2.move = onlinePendingMoves.p2;
       onlinePendingMoves = {};
       els.onlineWaiting.classList.add('hidden');
-      showBothPanels();
-      state.phase = 'both-chosen';
+      showBothPanels(); state.phase = 'both-chosen';
       setTimeout(() => resolveRound(), 300);
     }
     return;
@@ -466,11 +481,8 @@ function selectMove(player, moveKey, cardEl) {
     state.p1MoveHistory.push(moveKey);
     if (state.p1MoveHistory.length > 5) state.p1MoveHistory.shift();
     lockCards('p1');
-    if (gameMode !== '2p') {
-      setTimeout(() => triggerCpuMove(), 400);
-    } else {
-      setTimeout(() => setPhase('p2-choose'), 200);
-    }
+    if (gameMode !== '2p') setTimeout(() => triggerCpuMove(), 400);
+    else setTimeout(() => setPhase('p2-choose'), 200);
   } else {
     setPhase('both-chosen');
   }
@@ -483,12 +495,9 @@ async function triggerCpuMove() {
   const thinkTime = gameMode === 'easy' ? 600 : gameMode === 'medium' ? 900 : 1200;
   await delay(thinkTime);
   const chosenKey = pickCpuMove();
-  state.p2.move = chosenKey;
-  state.p2LastMove = chosenKey;
-  els.p2SelDisp.textContent = `✓ LOCKED`;
-  els.p2SelDisp.style.color = 'var(--cpu)';
-  const p2Cards = els.p2Cards.querySelectorAll('.card');
-  p2Cards.forEach(c => {
+  state.p2.move = chosenKey; state.p2LastMove = chosenKey;
+  els.p2SelDisp.textContent = `✓ LOCKED`; els.p2SelDisp.style.color = 'var(--cpu)';
+  els.p2Cards.querySelectorAll('.card').forEach(c => {
     if (c.dataset.move === chosenKey) c.classList.add('selected-p2');
     else c.classList.add('disabled');
   });
@@ -513,22 +522,17 @@ function pickEasyMove() {
 }
 
 function pickMediumMove() {
-  const cpuHp = state.p2.hp, cpuMaxHp = state.p2.maxHp;
-  const cpuHpPct = cpuHp / cpuMaxHp;
-  const p1Hp = state.p1.hp;
+  const cpuHp = state.p2.hp, cpuMaxHp = state.p2.maxHp, cpuHpPct = cpuHp / cpuMaxHp, p1Hp = state.p1.hp;
   if (cpuHpPct < 0.35 && cpuMaxHp > 1) return Math.random() < 0.65 ? 'HEAL' : 'BLOCK';
   if (p1Hp <= 2) { const f = ['HEAVY_ATK','QUICK_ATK','ATK']; return f[Math.floor(Math.random()*f.length)]; }
-  const weights = [
+  return weightedPick([
     { key: 'ATK', w: 20 }, { key: 'QUICK_ATK', w: 25 }, { key: 'HEAVY_ATK', w: 20 },
     { key: 'BLOCK', w: 20 }, { key: 'COUNTER', w: 10 }, { key: 'HEAL', w: 5 },
-  ];
-  return weightedPick(weights);
+  ]);
 }
 
 function pickHardMove() {
-  const cpuHp = state.p2.hp, cpuMaxHp = state.p2.maxHp;
-  const cpuHpPct = cpuHp / cpuMaxHp;
-  const p1Hp = state.p1.hp;
+  const cpuHp = state.p2.hp, cpuMaxHp = state.p2.maxHp, cpuHpPct = cpuHp / cpuMaxHp, p1Hp = state.p1.hp;
   const history = state.p1MoveHistory;
   if (cpuHpPct < 0.25 && cpuMaxHp > 1) return 'HEAL';
   const recentLen = Math.min(history.length, 4);
@@ -544,12 +548,11 @@ function pickHardMove() {
   if (lastMove === 'COUNTER' && Math.random() < 0.65) return 'HEAVY_ATK';
   if (lastMove === 'HEAL' && Math.random() < 0.6) return 'QUICK_ATK';
   if (p1Hp <= 3 && Math.random() < 0.5) return 'QUICK_ATK';
-  const weights = [
+  return weightedPick([
     { key: 'ATK', w: 10 }, { key: 'QUICK_ATK', w: 25 }, { key: 'HEAVY_ATK', w: 20 },
     { key: 'BLOCK', w: 15 }, { key: 'COUNTER', w: 20 },
     { key: 'HEAL', w: cpuHpPct < 0.6 ? 15 : 5 },
-  ];
-  return weightedPick(weights);
+  ]);
 }
 
 function weightedPick(weights) {
@@ -559,7 +562,7 @@ function weightedPick(weights) {
   return weights[weights.length - 1].key;
 }
 
-// ===== LOCK / UNLOCK CARDS =====
+// ===== LOCK / UNLOCK =====
 function lockCards(player) {
   const container = player === 'p1' ? els.p1Cards : els.p2Cards;
   container.querySelectorAll('.card').forEach(c => {
@@ -571,8 +574,8 @@ function unlockCards(player) {
   const container = player === 'p1' ? els.p1Cards : els.p2Cards;
   container.querySelectorAll('.card').forEach(c => c.classList.remove('disabled', 'selected-p1', 'selected-p2', 'online-hidden'));
   const dispEl = player === 'p1' ? els.p1SelDisp : els.p2SelDisp;
-  dispEl.textContent = '— NOT YET CHOSEN —';
-  dispEl.style.color = '';
+  dispEl.textContent = '— NOT YET CHOSEN —'; dispEl.style.color = '';
+  refreshAccDisplay(player);
 }
 
 function showActivePanel(player) {
@@ -585,8 +588,7 @@ function showActivePanel(player) {
 }
 
 function showBothPanels() {
-  const selArea = document.getElementById('selection-area');
-  selArea.classList.remove('single-panel');
+  document.getElementById('selection-area').classList.remove('single-panel');
   els.p1Panel.classList.remove('panel-active');
   els.p2Panel.classList.remove('panel-active');
 }
@@ -622,12 +624,8 @@ function setPhase(phase) {
       unlockCards('p1'); unlockCards('p2');
       state.p1.move = null; state.p2.move = null;
       els.p2Cards.querySelectorAll('.card').forEach(c => c.classList.add('disabled'));
-      if (gameMode !== '2p') {
-        els.p2SelDisp.textContent = '— CPU WILL CHOOSE —';
-        showActivePanel('p1');
-      } else {
-        showActivePanel('p1');
-      }
+      if (gameMode !== '2p') { els.p2SelDisp.textContent = '— CPU WILL CHOOSE —'; showActivePanel('p1'); }
+      else showActivePanel('p1');
     }
   } else if (phase === 'p2-choose') {
     banner.textContent = isMobile ? '🔥 P2 — CHOOSE' : '🔥 PLAYER 2 — CHOOSE YOUR MOVE';
@@ -647,11 +645,27 @@ async function resolveRound() {
   if (state.phase !== 'both-chosen') return;
   state.phase = 'resolve';
   els.btnResolve.classList.add('hidden');
+
   const m1 = MOVES[state.p1.move];
   const m2 = MOVES[state.p2.move];
   const p2Label = gameMode === 'online' ? 'OPP' : gameMode !== '2p' ? 'CPU' : 'P2';
+
   logEntry(`— ROUND ${state.round} —`, 'log-info');
   logEntry(`P1: ${m1.name}  |  ${p2Label}: ${m2.name}`, 'log-info');
+
+  // ===== ROLL ACCURACY =====
+  const p1Hit = rollAccuracy('p1', state.p1.move);
+  const p2Hit = rollAccuracy('p2', state.p2.move);
+
+  // Log accuracy outcomes
+  const p1Pct = getAccPct('p1', state.p1.move);
+  const p2Pct = getAccPct('p2', state.p2.move);
+  logEntry(`P1 ACC:${p1Pct}% → ${p1Hit ? 'HIT' : 'MISS'} | ${p2Label} ACC:${p2Pct}% → ${p2Hit ? 'HIT' : 'MISS'}`, 'log-info');
+
+  // ===== UPDATE BLOCK STREAKS (before applying effects) =====
+  updateBlockStreak('p1', state.p1.move, p1Hit);
+  updateBlockStreak('p2', state.p2.move, p2Hit);
+
   if (gameMode === 'online') {
     els.p2SelDisp.textContent = `✓ ${m2.name}`;
     const oppCards = onlineRole === 'p1' ? els.p2Cards : els.p1Cards;
@@ -663,17 +677,19 @@ async function resolveRound() {
     });
   }
   if (gameMode !== '2p' && gameMode !== 'online') els.p2SelDisp.textContent = `✓ ${m2.name}`;
+
   const p1Priority = m1.priority;
   const p2Priority = m2.priority;
   if (p1Priority === p2Priority) {
-    await applySimultaneous(m1, m2);
+    await applySimultaneous(m1, m2, p1Hit, p2Hit);
   } else if (p1Priority > p2Priority) {
-    await applyTurn('p1', m1, 'p2', m2);
-    if (!isGameOver()) await applyTurn('p2', m2, 'p1', m1, true);
+    await applyTurn('p1', m1, 'p2', m2, false, p1Hit);
+    if (!isGameOver()) await applyTurn('p2', m2, 'p1', m1, true, p2Hit);
   } else {
-    await applyTurn('p2', m2, 'p1', m1);
-    if (!isGameOver()) await applyTurn('p1', m1, 'p2', m2, true);
+    await applyTurn('p2', m2, 'p1', m1, false, p2Hit);
+    if (!isGameOver()) await applyTurn('p1', m1, 'p2', m2, true, p1Hit);
   }
+
   updateHUD();
   if (isGameOver()) { await delay(500); endGame(); return; }
   state.round++;
@@ -682,13 +698,33 @@ async function resolveRound() {
   setPhase('p1-choose');
 }
 
-async function applySimultaneous(m1, m2) {
-  const dmg1To2 = calcDamage('p1', m1, 'p2', m2);
-  const dmg2To1 = calcDamage('p2', m2, 'p1', m1);
-  const heal1 = m1.heal || 0, heal2 = m2.heal || 0;
-  const def2 = m2.defence || 0, def1 = m1.defence || 0;
+// ===== BLOCK STREAK TRACKING =====
+function updateBlockStreak(player, moveKey, hit) {
+  if (moveKey === 'BLOCK') {
+    // Only increment streak if block successfully activated; reset on miss
+    if (hit) state[player].blockStreak++;
+    else state[player].blockStreak = 0;
+  } else {
+    // Any non-block move resets the streak
+    state[player].blockStreak = 0;
+  }
+}
+
+// ===== SIMULTANEOUS TURNS =====
+async function applySimultaneous(m1, m2, p1Hit = true, p2Hit = true) {
+  // If a move missed, its effects are zeroed
+  const dmg1To2 = p1Hit ? calcDamage('p1', m1, 'p2', m2) : 0;
+  const dmg2To1 = p2Hit ? calcDamage('p2', m2, 'p1', m1) : 0;
+  const heal1   = (p1Hit && m1.heal)    ? m1.heal    : 0;
+  const heal2   = (p2Hit && m2.heal)    ? m2.heal    : 0;
+  const def2    = (p2Hit && m2.defence) ? m2.defence : 0;
+  const def1    = (p1Hit && m1.defence) ? m1.defence : 0;
   const actual1To2 = Math.max(0, dmg1To2 - def2);
   const actual2To1 = Math.max(0, dmg2To1 - def1);
+
+  if (!p1Hit) { spawnMissText('p1'); await delay(400); }
+  if (!p2Hit) { spawnMissText('p2'); await delay(400); }
+
   applyDamage('p2', actual1To2, 'p1', m1);
   applyDamage('p1', actual2To1, 'p2', m2);
   applyHealEffect('p1', heal1, m1);
@@ -697,16 +733,34 @@ async function applySimultaneous(m1, m2) {
   updateHUD();
 }
 
-async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = false) {
+// ===== SINGLE TURN WITH ACCURACY =====
+async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = false, hit = true) {
   const p2Label = gameMode === 'online' ? 'Opponent' : gameMode !== '2p' ? 'CPU' : 'P2';
   const attackerLabel = attacker === 'p1' ? 'Player 1' : p2Label;
   const defenderLabel = defender === 'p1' ? 'Player 1' : p2Label;
+
+  // ── MISS ──
+  if (!hit) {
+    const missMsg = atkMove.name === 'BLOCK'
+      ? `${attackerLabel}'s BLOCK fizzled!\nToo tired to hold guard — streak reset!`
+      : atkMove.name === 'HEAL'
+      ? `${attackerLabel}'s HEAL fizzled!\nConcentration broken — no HP restored!`
+      : `${attackerLabel}'s ${atkMove.name} MISSED!\nThe attack whiffed completely!`;
+    await showDialog(missMsg, 1800);
+    await animateMiss(attacker, atkMove);
+    return;
+  }
+
+  // ── HIT ──
   const dmg = calcDamage(attacker, atkMove, defender, defMove);
   const heal = atkMove.heal || 0;
   const defenderDef = defMove.defence || 0;
   const actualDmg = Math.max(0, dmg - defenderDef);
+
   if (atkMove.name === 'BLOCK') {
-    await showDialog(`${attackerLabel} takes a defensive stance!\nIncoming damage reduced by 2.`, 1600);
+    const streak = state[attacker].blockStreak;
+    const nextAcc = Math.round(getBlockAccuracy(streak) * 100);
+    await showDialog(`${attackerLabel} takes a defensive stance!\nIncoming damage reduced by 2.\n(Next BLOCK accuracy: ${nextAcc}%)`, 1800);
   } else if (atkMove.name === 'HEAL') {
     await showDialog(`${attackerLabel} is recovering HP!\n+6 HP restored! (Max HP -2)`, 1600);
   } else if (atkMove.name === 'COUNTER') {
@@ -726,12 +780,57 @@ async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = fa
       await showDialog(`${attackerLabel}'s ${atkMove.name} was blocked!\n${defenderLabel}'s guard held firm!`, 1600);
     }
   }
+
   applyDamage(defender, actualDmg, attacker, atkMove);
   applyHealEffect(attacker, heal, atkMove);
   await animateSingleTurn(attacker, atkMove, defender, defMove, actualDmg);
   updateHUD();
 }
 
+// ===== MISS ANIMATION =====
+async function animateMiss(attacker, atkMove) {
+  const atkSprite = attacker === 'p1' ? els.p1Sprite : els.p2Sprite;
+  atkSprite.style.transition = 'transform 120ms ease';
+  atkSprite.style.transform = 'translateX(10px) rotate(4deg)';
+  await delay(120);
+  atkSprite.style.transform = 'translateX(-8px) rotate(-3deg)';
+  await delay(100);
+  atkSprite.style.transition = 'transform 300ms ease';
+  atkSprite.style.transform = '';
+  await delay(200);
+  atkSprite.style.filter = 'brightness(0.4) grayscale(1)';
+  await delay(120);
+  atkSprite.style.transition = 'filter 400ms ease';
+  atkSprite.style.filter = '';
+  await delay(400);
+  atkSprite.style.transition = '';
+  spawnMissText(attacker);
+  await delay(300);
+}
+
+function spawnMissText(target) {
+  const sprite = target === 'p1' ? els.p1Sprite : els.p2Sprite;
+  const rect = sprite.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.style.cssText = `
+    position:fixed;
+    left:${rect.left + rect.width / 2}px;
+    top:${rect.top}px;
+    font-family:var(--font-title);
+    font-size:${window.innerWidth < 480 ? '1.1rem' : '1.6rem'};
+    color:#888888;
+    text-shadow:2px 2px 0 #000,0 0 10px #444;
+    pointer-events:none;
+    z-index:1000;
+    transform:translate(-50%,-50%);
+    animation:dmgFloat 0.9s cubic-bezier(0.2,1.4,0.4,1) forwards;
+  `;
+  el.textContent = 'MISS!';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 900);
+}
+
+// ===== DAMAGE CALC =====
 function calcDamage(attacker, atkMove, defender, defMove) {
   if (atkMove.name === 'COUNTER') {
     if (defMove.name === 'QUICK ATK') { logEntry(`${attacker.toUpperCase()} COUNTER — too slow for QUICK ATK!`, 'log-info'); return 0; }
@@ -748,11 +847,8 @@ function applyDamage(target, amount, source, srcMove) {
   if (amount <= 0) return;
   state[target].hp = Math.max(0, state[target].hp - amount);
   const p2Label = gameMode === 'online' ? 'OPP' : gameMode !== '2p' ? 'CPU' : 'P2';
-  const srcLabel = source === 'p2' ? p2Label : 'P1';
-  const tgtLabel = target === 'p2' ? p2Label : 'P1';
-  logEntry(`${srcLabel} hits ${tgtLabel} for ${amount} dmg!`, 'log-dmg');
-  const type = srcMove && srcMove.name === 'COUNTER' ? 'counter' : 'dmg';
-  spawnDamageNumber(target, amount, type);
+  logEntry(`${source === 'p2' ? p2Label : 'P1'} hits ${target === 'p2' ? p2Label : 'P1'} for ${amount} dmg!`, 'log-dmg');
+  spawnDamageNumber(target, amount, srcMove && srcMove.name === 'COUNTER' ? 'counter' : 'dmg');
 }
 
 function applyHealEffect(player, amount, move) {
@@ -760,20 +856,18 @@ function applyHealEffect(player, amount, move) {
   state[player].maxHp = Math.max(1, state[player].maxHp - 2);
   state[player].hp = Math.min(state[player].maxHp, state[player].hp + amount);
   const p2Label = gameMode === 'online' ? 'OPP' : gameMode !== '2p' ? 'CPU' : 'P2';
-  const label = player === 'p2' ? p2Label : 'P1';
-  logEntry(`${label} heals! HP: ${state[player].hp}/${state[player].maxHp}`, 'log-heal');
+  logEntry(`${player === 'p2' ? p2Label : 'P1'} heals! HP: ${state[player].hp}/${state[player].maxHp}`, 'log-heal');
   spawnDamageNumber(player, amount, 'heal');
 }
 
-// ===== CINEMATIC ANIMATION ENGINE =====
+// ===== ANIMATION ENGINE =====
 let particleCanvas, particleCtx;
 function initParticleCanvas() {
   if (particleCanvas) return;
   particleCanvas = document.createElement('canvas');
   particleCanvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:998;';
   document.body.appendChild(particleCanvas);
-  particleCanvas.width = window.innerWidth;
-  particleCanvas.height = window.innerHeight;
+  particleCanvas.width = window.innerWidth; particleCanvas.height = window.innerHeight;
   particleCtx = particleCanvas.getContext('2d');
   window.addEventListener('resize', () => {
     if (particleCanvas) { particleCanvas.width = window.innerWidth; particleCanvas.height = window.innerHeight; }
@@ -826,27 +920,22 @@ function screenShake(intensity = 8, duration = 600) {
   function shake(now) {
     const elapsed = now - startTime;
     if (elapsed >= duration) { game.style.transform = ''; return; }
-    const progress = elapsed / duration;
-    const damping = 1 - progress;
-    const dx = (Math.random() - 0.5) * intensity * 2 * damping;
-    const dy = (Math.random() - 0.5) * intensity * damping;
-    game.style.transform = `translate(${dx}px, ${dy}px)`;
+    const damping = 1 - elapsed / duration;
+    game.style.transform = `translate(${(Math.random()-0.5)*intensity*2*damping}px,${(Math.random()-0.5)*intensity*damping}px)`;
     requestAnimationFrame(shake);
   }
   requestAnimationFrame(shake);
 }
 
-// ─── Card-aware animation helpers (no scaleX flip needed — PNG faces correctly) ───
-
 function zoomPunch(spriteEl, scale = 1.35, duration = 300) {
   return new Promise(resolve => {
-    spriteEl.style.transition = `transform ${duration * 0.4}ms cubic-bezier(0.2,1.6,0.4,1)`;
+    spriteEl.style.transition = `transform ${duration*0.4}ms cubic-bezier(0.2,1.6,0.4,1)`;
     spriteEl.style.transform = `scale(${scale})`;
     setTimeout(() => {
-      spriteEl.style.transition = `transform ${duration * 0.6}ms ease`;
+      spriteEl.style.transition = `transform ${duration*0.6}ms ease`;
       spriteEl.style.transform = '';
-      setTimeout(() => { spriteEl.style.transition = ''; spriteEl.style.transform = ''; resolve(); }, duration * 0.6);
-    }, duration * 0.4);
+      setTimeout(() => { spriteEl.style.transition = ''; spriteEl.style.transform = ''; resolve(); }, duration*0.6);
+    }, duration*0.4);
   });
 }
 
@@ -860,9 +949,8 @@ function hitFreeze(duration = 220) {
 
 function lungePunch(spriteEl, direction = 1) {
   return new Promise(resolve => {
-    const dist = direction * 55;
     spriteEl.style.transition = 'transform 180ms cubic-bezier(0.2,1.4,0.4,1)';
-    spriteEl.style.transform = `translateX(${dist}px) scale(1.15)`;
+    spriteEl.style.transform = `translateX(${direction*55}px) scale(1.15)`;
     setTimeout(() => {
       spriteEl.style.transition = 'transform 340ms ease';
       spriteEl.style.transform = '';
@@ -873,9 +961,8 @@ function lungePunch(spriteEl, direction = 1) {
 
 function recoilHit(spriteEl, direction = -1) {
   return new Promise(resolve => {
-    const dist = direction * 45;
     spriteEl.style.transition = 'transform 100ms ease';
-    spriteEl.style.transform = `translateX(${dist}px) scale(0.9)`;
+    spriteEl.style.transform = `translateX(${direction*45}px) scale(0.9)`;
     setTimeout(() => {
       spriteEl.style.transition = 'transform 500ms cubic-bezier(0.2,1.2,0.4,1)';
       spriteEl.style.transform = '';
@@ -920,10 +1007,10 @@ function spawnHealParticles(x, y) {
   const particles = [];
   for (let i = 0; i < 24; i++) {
     particles.push({
-      x: x + (Math.random() - 0.5) * 50, y: y + Math.random() * 20,
-      vx: (Math.random() - 0.5) * 2.5, vy: -(2.5 + Math.random() * 5),
-      life: 1, decay: 0.018 + Math.random() * 0.015, size: 4 + Math.random() * 5,
-      color: `hsl(${110 + Math.random() * 50}, 85%, 60%)`,
+      x: x + (Math.random()-0.5)*50, y: y + Math.random()*20,
+      vx: (Math.random()-0.5)*2.5, vy: -(2.5+Math.random()*5),
+      life: 1, decay: 0.018+Math.random()*0.015, size: 4+Math.random()*5,
+      color: `hsl(${110+Math.random()*50},85%,60%)`,
     });
   }
   animateParticles(particles);
@@ -948,41 +1035,34 @@ async function animateSingleTurn(attacker, atkMove, defender, defMove, dmg) {
   const defSprite = defender === 'p1' ? els.p1Sprite : els.p2Sprite;
   const moveName = atkMove.name;
   const atkDir = attacker === 'p1' ? 1 : -1;
-  if (moveName === 'HEAL') {
-    await healGlow(atkSprite); await delay(300);
-  } else if (moveName === 'BLOCK') {
-    await blockFlash(atkSprite); await delay(200);
-  } else if (moveName === 'COUNTER') {
+  if (moveName === 'HEAL') { await healGlow(atkSprite); await delay(300); }
+  else if (moveName === 'BLOCK') { await blockFlash(atkSprite); await delay(200); }
+  else if (moveName === 'COUNTER') {
     if (dmg > 0) {
-      await lungePunch(defSprite, atkDir * -1);
-      await hitFreeze(150);
+      await lungePunch(defSprite, atkDir * -1); await hitFreeze(150);
       await Promise.all([spriteFlash(atkSprite, '#b04aff', 3), recoilHit(defSprite, atkDir)]);
-      await delay(200);
-      await hitFreeze(300);
-      await lungePunch(atkSprite, atkDir);
+      await delay(200); await hitFreeze(300); await lungePunch(atkSprite, atkDir);
       const center = getSpriteCenter(defSprite);
       spawnImpactParticles(center.x, center.y, '#b04aff', 36);
       await Promise.all([hitFreeze(400), screenShake(16, 700), spriteFlash(defSprite, '#ff4444', 6), recoilHit(defSprite, atkDir * -1), flashHitCinematic(defender, '#b04aff')]);
       await delay(300);
-    } else {
-      spriteFlash(atkSprite, '#555555', 3); await delay(600);
-    }
+    } else { spriteFlash(atkSprite, '#555555', 3); await delay(600); }
   } else {
-    const isHeavy = moveName === 'HEAVY ATK';
-    const isQuick = moveName === 'QUICK ATK';
+    const isHeavy = moveName === 'HEAVY ATK', isQuick = moveName === 'QUICK ATK';
     if (isHeavy) { await zoomPunch(atkSprite, 1.2, 300); await hitFreeze(200); }
     await lungePunch(atkSprite, atkDir);
     if (dmg > 0) {
       const center = getSpriteCenter(defSprite);
       const impactColor = attacker === 'p1' ? '#f7c948' : '#e03c3c';
-      const particleCount = isHeavy ? 36 : isQuick ? 16 : 22;
-      spawnImpactParticles(center.x, center.y, impactColor, particleCount);
+      spawnImpactParticles(center.x, center.y, impactColor, isHeavy ? 36 : isQuick ? 16 : 22);
       if (isHeavy) setTimeout(() => spawnImpactParticles(center.x, center.y, '#ff8800', 18), 120);
-      const freezeDur = isHeavy ? 400 : isQuick ? 150 : 250;
-      const shakeMag  = isHeavy ? 18  : isQuick ? 7   : 10;
-      const shakeDur  = isHeavy ? 700 : isQuick ? 350 : 500;
-      const flashTimes = isHeavy ? 6  : isQuick ? 3   : 4;
-      await Promise.all([hitFreeze(freezeDur), screenShake(shakeMag, shakeDur), spriteFlash(defSprite, impactColor, flashTimes), recoilHit(defSprite, atkDir * -1), flashHitCinematic(defender, impactColor)]);
+      await Promise.all([
+        hitFreeze(isHeavy ? 400 : isQuick ? 150 : 250),
+        screenShake(isHeavy ? 18 : isQuick ? 7 : 10, isHeavy ? 700 : isQuick ? 350 : 500),
+        spriteFlash(defSprite, impactColor, isHeavy ? 6 : isQuick ? 3 : 4),
+        recoilHit(defSprite, atkDir * -1),
+        flashHitCinematic(defender, impactColor)
+      ]);
       await delay(isHeavy ? 250 : 100);
     }
   }
@@ -991,8 +1071,7 @@ async function animateSingleTurn(attacker, atkMove, defender, defMove, dmg) {
 
 async function animateMoves(p1, m1, p2, m2, dmg1, dmg2) {
   initParticleCanvas();
-  const sprite1 = els.p1Sprite;
-  const sprite2 = els.p2Sprite;
+  const sprite1 = els.p1Sprite, sprite2 = els.p2Sprite;
   const lunges = [];
   if (m1.name !== 'BLOCK' && m1.name !== 'HEAL') lunges.push(lungePunch(sprite1, 1));
   else if (m1.name === 'BLOCK') lunges.push(blockFlash(sprite1));
@@ -1005,16 +1084,12 @@ async function animateMoves(p1, m1, p2, m2, dmg1, dmg2) {
   if (dmg1 > 0) {
     const center = getSpriteCenter(sprite2);
     spawnImpactParticles(center.x, center.y, '#f7c948', 22);
-    impactPromises.push(spriteFlash(sprite2, '#f7c948', 4));
-    impactPromises.push(recoilHit(sprite2, 1));
-    impactPromises.push(flashHitCinematic('p2', '#f7c948'));
+    impactPromises.push(spriteFlash(sprite2, '#f7c948', 4), recoilHit(sprite2, 1), flashHitCinematic('p2', '#f7c948'));
   }
   if (dmg2 > 0) {
     const center = getSpriteCenter(sprite1);
     spawnImpactParticles(center.x, center.y, '#e03c3c', 22);
-    impactPromises.push(spriteFlash(sprite1, '#e03c3c', 4));
-    impactPromises.push(recoilHit(sprite1, -1));
-    impactPromises.push(flashHitCinematic('p1', '#e03c3c'));
+    impactPromises.push(spriteFlash(sprite1, '#e03c3c', 4), recoilHit(sprite1, -1), flashHitCinematic('p1', '#e03c3c'));
   }
   if (impactPromises.length) await Promise.all([hitFreeze(260), screenShake(10, 500), ...impactPromises]);
   await delay(200);
@@ -1023,8 +1098,7 @@ async function animateMoves(p1, m1, p2, m2, dmg1, dmg2) {
 
 function flashHitCinematic(player, color) {
   const overlay = els.hitOverlay;
-  const hex = color || (player === 'p1' ? 'rgba(247,201,72,0.3)' : 'rgba(224,60,60,0.35)');
-  overlay.style.background = hex;
+  overlay.style.background = color || (player === 'p1' ? 'rgba(247,201,72,0.3)' : 'rgba(224,60,60,0.35)');
   overlay.style.opacity = '1';
   return new Promise(resolve => {
     setTimeout(() => {
@@ -1035,7 +1109,7 @@ function flashHitCinematic(player, color) {
   });
 }
 
-// ===== FLOATING DAMAGE NUMBERS =====
+// ===== FLOATING NUMBERS =====
 function spawnDamageNumber(target, amount, type = 'dmg') {
   const sprite = target === 'p1' ? els.p1Sprite : els.p2Sprite;
   const rect = sprite.getBoundingClientRect();
@@ -1050,9 +1124,8 @@ function spawnDamageNumber(target, amount, type = 'dmg') {
     font-family:var(--font-title);
     font-size:${isMobile ? '1.4rem' : (type === 'counter' ? '2.2rem' : amount >= 2 ? '2rem' : '1.6rem')};
     color:${colors[type] || colors.dmg};
-    text-shadow: 2px 2px 0 #000, 0 0 16px ${colors[type] || colors.dmg};
-    pointer-events:none;
-    z-index:1000;
+    text-shadow:2px 2px 0 #000,0 0 16px ${colors[type] || colors.dmg};
+    pointer-events:none;z-index:1000;
     transform:translate(-50%,-50%);
     animation:dmgFloat 0.9s cubic-bezier(0.2,1.4,0.4,1) forwards;
   `;
@@ -1061,10 +1134,7 @@ function spawnDamageNumber(target, amount, type = 'dmg') {
   setTimeout(() => el.remove(), 900);
 }
 
-function updateHUD() {
-  updatePlayerHUD('p1');
-  updatePlayerHUD('p2');
-}
+function updateHUD() { updatePlayerHUD('p1'); updatePlayerHUD('p2'); }
 
 function updatePlayerHUD(player) {
   const p = state[player];
@@ -1116,9 +1186,9 @@ function getVictoryFlair(hp, maxHp) {
 
 function getCpuVictoryTaunt(diff) {
   const taunts = {
-    easy:   ['EVEN EASY MODE BEAT YOU...', 'Rookie mistake.', 'Try again, champ.'],
-    medium: ['The CPU learns from you.', 'Pattern detected. Pattern punished.', 'A solid defeat.'],
-    hard:   ['CALCULATED.', 'Your moves were predictable.', 'Perfect read. Every round.'],
+    easy:   ['EVEN EASY MODE BEAT YOU...','Rookie mistake.','Try again, champ.'],
+    medium: ['The CPU learns from you.','Pattern detected. Pattern punished.','A solid defeat.'],
+    hard:   ['CALCULATED.','Your moves were predictable.','Perfect read. Every round.'],
   };
   const arr = taunts[diff] || taunts.medium;
   return arr[Math.floor(Math.random() * arr.length)];
@@ -1126,9 +1196,9 @@ function getCpuVictoryTaunt(diff) {
 
 function getPlayerVictoryTaunt(diff) {
   const taunts = {
-    easy:   ['Warm-up complete!', 'Nice one, now try MEDIUM.', 'Easy mode conquered!'],
-    medium: ['Strong reads!', 'The CPU never saw it coming.', 'Solid strategy!'],
-    hard:   ['IMPOSSIBLE... yet here we are.', 'HARD MODE DESTROYED!', 'Flawless tactical mastery.'],
+    easy:   ['Warm-up complete!','Nice one, now try MEDIUM.','Easy mode conquered!'],
+    medium: ['Strong reads!','The CPU never saw it coming.','Solid strategy!'],
+    hard:   ['IMPOSSIBLE... yet here we are.','HARD MODE DESTROYED!','Flawless tactical mastery.'],
   };
   const arr = taunts[diff] || taunts.medium;
   return arr[Math.floor(Math.random() * arr.length)];
