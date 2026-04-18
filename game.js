@@ -994,7 +994,7 @@ function setPhase(phase) {
       state.p1.move = null; state.p2.move = null;
       banner.textContent = isMobile ? '⚡ PICK SECRETLY' : '⚡ PICK YOUR MOVE — OPPONENT PICKS SECRETLY';
       banner.classList.add('online-wait');
-      if (timerState.suddenDeath) { banner.textContent = '⚡ SUDDEN DEATH — PICK!'; banner.classList.add('sd-phase'); }
+      if (timerState.suddenDeath) { banner.textContent = '⚡ NO GUARD BRAWL — PICK!'; banner.classList.add('sd-phase'); }
       const myPanel = onlineRole === 'p1' ? 'p1' : 'p2';
       showActivePanel(myPanel);
       const oppCards = onlineRole === 'p1' ? els.p2Cards : els.p1Cards;
@@ -1008,7 +1008,7 @@ function setPhase(phase) {
       }
     } else {
       if (timerState.suddenDeath) {
-        banner.textContent = isMobile ? '💀 SUDDEN DEATH!' : '💀 SUDDEN DEATH — BLOCK & HEAL BANNED!';
+        banner.textContent = isMobile ? '💀 NO GUARD BRAWL!' : '💀 NO GUARD BRAWL — BLOCK & HEAL BANNED!';
         banner.classList.add('sd-phase');
       } else {
         banner.textContent = isMobile ? '⚡ P1 — CHOOSE' : '⚡ PLAYER 1 — CHOOSE YOUR MOVE';
@@ -1026,7 +1026,7 @@ function setPhase(phase) {
 
   } else if (phase === 'p2-choose') {
     if (timerState.suddenDeath) {
-      banner.textContent = isMobile ? '💀 SUDDEN DEATH!' : '💀 SUDDEN DEATH — CHOOSE NOW!';
+      banner.textContent = isMobile ? '💀 NO GUARD BRAWL!' : '💀 NO GUARD BRAWL — CHOOSE NOW!';
       banner.classList.add('p2-turn', 'sd-phase');
     } else {
       banner.textContent = isMobile ? '🔥 P2 — CHOOSE' : '🔥 PLAYER 2 — CHOOSE YOUR MOVE';
