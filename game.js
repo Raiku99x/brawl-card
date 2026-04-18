@@ -411,7 +411,6 @@ function resetTimers() {
 }
 
 function updateTimerHUD() {
-  if (!els.timerBar) return;
 
   // Match clock (top bar)
   if (els.matchClock) {
