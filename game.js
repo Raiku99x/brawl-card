@@ -432,7 +432,7 @@ function updateTimerHUD() {
     const p1pct = Math.max(0, timerState.p1BankLeft / TIMER_CONFIG.BANK_TIME * 100);
     els.p1BankFill.style.width = p1pct + '%';
     els.p1BankFill.className = 'bank-fill p1' + (p1pct > 30 ? '' : p1pct > 15 ? ' warn' : ' danger');
-    els.p1BankVal.textContent = fmtTime(timerState.p1BankLeft);
+    els.p1BankVal.textContent = gameMode === 'online' && onlineRole === 'p2' ? 'HIDDEN' : fmtTime(timerState.p1BankLeft);
     els.p1BankVal.className = 'bank-val' + (p1pct <= 15 ? ' danger' : p1pct <= 30 ? ' warn' : '');
   }
 
@@ -441,7 +441,7 @@ function updateTimerHUD() {
     const p2pct = Math.max(0, timerState.p2BankLeft / TIMER_CONFIG.BANK_TIME * 100);
     els.p2BankFill.style.width = p2pct + '%';
     els.p2BankFill.className = 'bank-fill p2' + (p2pct > 30 ? '' : p2pct > 15 ? ' warn' : ' danger');
-    els.p2BankVal.textContent = fmtTime(timerState.p2BankLeft);
+    els.p2BankVal.textContent = gameMode === 'online' && onlineRole === 'p1' ? 'HIDDEN' : fmtTime(timerState.p2BankLeft);
     els.p2BankVal.className = 'bank-val right' + (p2pct <= 15 ? ' danger' : p2pct <= 30 ? ' warn' : '');
   }
 }
