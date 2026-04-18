@@ -424,13 +424,14 @@ function updateTimerHUD() {
   if (els.moveCountdown) {
     const mv = Math.ceil(timerState.moveLeft);
     els.moveCountdown.textContent = mv;
-    const mpct = timerState.moveLeft / TIMER_CONFIG.MOVE_TIME;
+    const moveLimit = timerState.suddenDeath ? TIMER_CONFIG.SUDDEN_DEATH_MOVE_TIME : TIMER_CONFIG.MOVE_TIME;
+    const mpct = timerState.moveLeft / moveLimit;
     els.moveCountdown.className = 'move-countdown' + (mpct > 0.4 ? '' : mpct > 0.2 ? ' warn' : ' danger');
   }
 
   // Move bar fill
   if (els.moveFill) {
-    const pct = Math.max(0, timerState.moveLeft / TIMER_CONFIG.MOVE_TIME * 100);
+    const pct = Math.max(0, timerState.moveLeft / moveLimit * 100);
     els.moveFill.style.width = pct + '%';
     const mpct = pct / 100;
     els.moveFill.style.background = mpct > 0.4 ? 'var(--accent)' : mpct > 0.2 ? 'var(--p1)' : 'var(--p2)';
