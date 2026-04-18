@@ -530,9 +530,21 @@ function hideSuddenDeathOverlay() {
 
 function showTiedOverlay() {
   if (!els.sdOverlay) return;
-  els.sdOverlay.querySelector('.sd-skull').textContent = '⚔️';
-  els.sdOverlay.querySelector('.sd-title').textContent = 'STILL TIED!';
-  els.sdOverlay.querySelector('.sd-sub').textContent = 'Neither fighter falls...\nAnother round begins!';
+const p1hp = state.p1.hp;
+  const p2hp = state.p2.hp;
+  if (p1hp > p2hp) {
+    els.sdOverlay.querySelector('.sd-skull').textContent = '⚡';
+    els.sdOverlay.querySelector('.sd-title').textContent = 'P1 LEADS!';
+    els.sdOverlay.querySelector('.sd-sub').textContent = `P1 HP: ${p1hp}  >  P2 HP: ${p2hp}\nPlayer 1 is finishing Player 2!\nAnother round continues...`;
+  } else if (p2hp > p1hp) {
+    els.sdOverlay.querySelector('.sd-skull').textContent = '🔥';
+    els.sdOverlay.querySelector('.sd-title').textContent = 'P2 LEADS!';
+    els.sdOverlay.querySelector('.sd-sub').textContent = `P2 HP: ${p2hp}  >  P1 HP: ${p1hp}\nPlayer 2 is finishing Player 1!\nAnother round continues...`;
+  } else {
+    els.sdOverlay.querySelector('.sd-skull').textContent = '⚔️';
+    els.sdOverlay.querySelector('.sd-title').textContent = 'STILL TIED!';
+    els.sdOverlay.querySelector('.sd-sub').textContent = `P1 HP: ${p1hp}  =  P2 HP: ${p2hp}\nNeither fighter falls...\nAnother round begins!`;
+  }
   els.sdOverlay.querySelector('.sd-rule-row').style.display = 'none';
   els.sdOverlay.querySelector('.sd-quick-note').style.display = 'none';
   els.sdOverlay.classList.remove('hidden');
