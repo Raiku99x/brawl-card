@@ -734,7 +734,7 @@ function updateBlockStreak(player, moveKey, hit) {
 // ===== SIMULTANEOUS TURNS =====
 async function applySimultaneous(m1, m2, p1Hit = true, p2Hit = true) {
   spawnClashText(m1.name, m2.name);
-  await delay(350);
+  await delay(600);
   const dmg1To2 = p1Hit ? calcDamage('p1', m1, 'p2', m2) : 0;
   const dmg2To1 = p2Hit ? calcDamage('p2', m2, 'p1', m1) : 0;
   const heal1   = (p1Hit && m1.heal) ? m1.heal : 0;
@@ -850,13 +850,18 @@ async function animateMiss(attacker, atkMove) {
 function spawnClashText(move1, move2) {
   const arena = document.querySelector('.arena');
   const rect = arena.getBoundingClientRect();
-  const el = document.createElement('div');
-  el.style.cssText = `
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const isMobile = window.innerWidth < 480;
+
+  // First: CLASH!
+  const el1 = document.createElement('div');
+  el1.style.cssText = `
     position:fixed;
-    left:${rect.left + rect.width / 2}px;
-    top:${rect.top + rect.height / 2}px;
+    left:${cx}px;
+    top:${cy}px;
     font-family:var(--font-title);
-    font-size:${window.innerWidth < 480 ? '1.2rem' : '1.8rem'};
+    font-size:${isMobile ? '1.2rem' : '1.8rem'};
     color:#f7c948;
     text-shadow:2px 2px 0 #000, 0 0 16px #f7c948;
     pointer-events:none;
@@ -864,11 +869,31 @@ function spawnClashText(move1, move2) {
     transform:translate(-50%,-50%);
     animation:dmgFloat 1.1s cubic-bezier(0.2,1.4,0.4,1) forwards;
   `;
-  el.textContent = `CLASH! ${move1} vs ${move2}`;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 1100);
-}
+  el1.textContent = 'CLASH!';
+  document.body.appendChild(el1);
+  setTimeout(() => el1.remove(), 1100);
 
+  // Second: move vs move (delayed)
+  setTimeout(() => {
+    const el2 = document.createElement('div');
+    el2.style.cssText = `
+      position:fixed;
+      left:${cx}px;
+      top:${cy}px;
+      font-family:var(--font-title);
+      font-size:${isMobile ? '0.55rem' : '0.72rem'};
+      color:#f7c948;
+      text-shadow:1px 1px 0 #000, 0 0 10px #f7c948;
+      pointer-events:none;
+      z-index:1000;
+      transform:translate(-50%,-50%);
+      animation:dmgFloat 1.1s cubic-bezier(0.2,1.4,0.4,1) forwards;
+    `;
+    el2.textContent = `${move1} vs ${move2}`;
+    document.body.appendChild(el2);
+    setTimeout(() => el2.remove(), 1100);
+  }, 320);
+}
 function spawnMissText(target, label = 'MISS!') {
   const sprite = target === 'p1' ? els.p1Sprite : els.p2Sprite;
   const rect = sprite.getBoundingClientRect();
