@@ -495,7 +495,7 @@ async function triggerSuddenDeath() {
   }
 
   showSuddenDeathOverlay();
-  await delay(6000);
+  await delay(4500);
   hideSuddenDeathOverlay();
 
   // Prevent match clock from triggering again
