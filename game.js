@@ -489,9 +489,8 @@ async function triggerSuddenDeath() {
     return;
   }
 
-  // Tied HP — show sudden death overlay
   showSuddenDeathOverlay();
-  await delay(3200);
+  await delay(6000);
   hideSuddenDeathOverlay();
 
   // Prevent match clock from triggering again
