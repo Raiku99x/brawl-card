@@ -378,10 +378,38 @@ function resetTimers() {
           }
         }, 200);
       }
-    }, 100);
-  }
-
-function stopMoveTimer() {
+   function resetTimers() {
+  stopMoveTimer();
+  if (timerState._matchTimer) clearInterval(timerState._matchTimer);
+  timerState = {
+    moveLeft:    TIMER_CONFIG.MOVE_TIME,
+    p1BankLeft:  TIMER_CONFIG.BANK_TIME,
+    p2BankLeft:  TIMER_CONFIG.BANK_TIME,
+    matchLeft:   TIMER_CONFIG.MATCH_TIME,
+    activeTimer: null,
+    paused:      false,
+    suddenDeath: false,
+  };
+  updateTimerHUD();
+  if (gameMode === 'online' && !onlineOpponentConnected) return;
+  let lastMatchTick = Date.now();
+  timerState._matchTimer = setInterval(() => {
+    const now = Date.now();
+    const dt = (now - lastMatchTick) / 1000;
+    lastMatchTick = now;
+    timerState.matchLeft = Math.max(0, timerState.matchLeft - dt);
+    updateTimerHUD();
+    if (timerState.matchLeft <= 0) {
+      clearInterval(timerState._matchTimer);
+      const waitForRound = setInterval(() => {
+        if (state.phase === 'p1-choose') {
+          clearInterval(waitForRound);
+          triggerSuddenDeath();
+        }
+      }, 200);
+    }
+  }, 100);
+}
   if (timerState.activeTimer) {
     clearInterval(timerState.activeTimer);
     timerState.activeTimer = null;
