@@ -733,6 +733,8 @@ function updateBlockStreak(player, moveKey, hit) {
 
 // ===== SIMULTANEOUS TURNS =====
 async function applySimultaneous(m1, m2, p1Hit = true, p2Hit = true) {
+  spawnClashText();
+  await delay(350);
   const dmg1To2 = p1Hit ? calcDamage('p1', m1, 'p2', m2) : 0;
   const dmg2To1 = p2Hit ? calcDamage('p2', m2, 'p1', m1) : 0;
   const heal1   = (p1Hit && m1.heal) ? m1.heal : 0;
@@ -843,6 +845,28 @@ async function animateMiss(attacker, atkMove) {
   const missTarget = atkMove.name === 'BLOCK' ? attacker : (attacker === 'p1' ? 'p2' : 'p1');
   spawnMissText(missTarget, atkMove.name === 'BLOCK' ? 'BLOCK FAILED!' : 'MISS!');
   await delay(300);
+}
+
+function spawnClashText() {
+  const arena = document.querySelector('.arena');
+  const rect = arena.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.style.cssText = `
+    position:fixed;
+    left:${rect.left + rect.width / 2}px;
+    top:${rect.top + rect.height / 2}px;
+    font-family:var(--font-title);
+    font-size:${window.innerWidth < 480 ? '1.2rem' : '1.8rem'};
+    color:#f7c948;
+    text-shadow:2px 2px 0 #000, 0 0 16px #f7c948;
+    pointer-events:none;
+    z-index:1000;
+    transform:translate(-50%,-50%);
+    animation:dmgFloat 1.1s cubic-bezier(0.2,1.4,0.4,1) forwards;
+  `;
+  el.textContent = 'CLASH!';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1100);
 }
 
 function spawnMissText(target, label = 'MISS!') {
