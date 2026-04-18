@@ -73,7 +73,7 @@ const TIMER_CONFIG = {
   MOVE_TIME:  15,
   SUDDEN_DEATH_MOVE_TIME: 30,
   BANK_TIME:  180,  // 3 minutes per player
-  MATCH_TIME: 360,  // 6 minutes total
+  MATCH_TIME: 10,  // 6 minutes total
 };
 
 // Sudden death moves — Block and Heal are locked out
@@ -348,38 +348,8 @@ function fmtTime(s) {
   return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 }
 
-function stopMoveTimer() {
-  if (timerState.activeTimer) {
-    clearInterval(timerState.activeTimer);
-    timerState.activeTimer = null;
-  }
-}
-
-function startMoveTimer(player) {
-  stopMoveTimer();
-  const moveLimit = timerState.suddenDeath
-    ? TIMER_CONFIG.SUDDEN_DEATH_MOVE_TIME
-    : TIMER_CONFIG.MOVE_TIME;
-  timerState.moveLeft = moveLimit;
-  let lastTick = Date.now();
-  timerState.activeTimer = setInterval(() => {
-    const now = Date.now();
-    const dt = (now - lastTick) / 1000;
-    lastTick = now;
-    timerState.moveLeft = Math.max(0, timerState.moveLeft - dt);
-    const bankKey = player === 'p1' ? 'p1BankLeft' : 'p2BankLeft';
-    timerState[bankKey] = Math.max(0, timerState[bankKey] - dt);
-    updateTimerHUD();
-    if (timerState.moveLeft <= 0 || timerState[bankKey] <= 0) {
-      stopMoveTimer();
-      handleTimeExpiry(player);
-    }
-  }, 100);
-}
-
 function resetTimers() {
   stopMoveTimer();
-  if (timerState._matchTimer) clearInterval(timerState._matchTimer);
   timerState = {
     moveLeft:    TIMER_CONFIG.MOVE_TIME,
     p1BankLeft:  TIMER_CONFIG.BANK_TIME,
@@ -390,15 +360,11 @@ function resetTimers() {
     suddenDeath: false,
   };
   updateTimerHUD();
-  if (gameMode === 'online' && !onlineOpponentConnected) return;
-  let lastMatchTick = Date.now();
+  if (timerState._matchTimer) clearInterval(timerState._matchTimer);
   timerState._matchTimer = setInterval(() => {
-    const now = Date.now();
-    const dt = (now - lastMatchTick) / 1000;
-    lastMatchTick = now;
-    timerState.matchLeft = Math.max(0, timerState.matchLeft - dt);
-    updateTimerHUD();
-    if (timerState.matchLeft <= 0) {
+      timerState.matchLeft = Math.max(0, timerState.matchLeft - 0.1);
+      updateTimerHUD();
+      if (timerState.matchLeft <= 0) {
       clearInterval(timerState._matchTimer);
       const waitForRound = setInterval(() => {
         if (state.phase === 'p1-choose') {
@@ -407,10 +373,50 @@ function resetTimers() {
         }
       }, 200);
     }
+    }, 100);
+  }
+
+function stopMoveTimer() {
+  if (timerState.activeTimer) {
+    clearInterval(timerState.activeTimer);
+    timerState.activeTimer = null;
+  }
+}
+
+function startMoveTimer(player) {
+  stopMoveTimer();
+  timerState.moveLeft = timerState.suddenDeath ? TIMER_CONFIG.SUDDEN_DEATH_MOVE_TIME : TIMER_CONFIG.MOVE_TIME;
+  timerState.paused = false;
+
+  timerState.activeTimer = setInterval(() => {
+    if (timerState.paused) return;
+
+    const dt = 0.1;
+    timerState.moveLeft  = Math.max(0, timerState.moveLeft - dt);
+
+    if (player === 'p1') timerState.p1BankLeft = Math.max(0, timerState.p1BankLeft - dt);
+    else                  timerState.p2BankLeft = Math.max(0, timerState.p2BankLeft - dt);
+
+    updateTimerHUD();
+
+    // Match ceiling — sudden death
+    if (timerState.matchLeft <= 0) {
+      stopMoveTimer();
+      triggerSuddenDeath();
+      return;
+    }
+
+    // Move time or bank expired — auto-pick ATK
+    const bankLeft = player === 'p1' ? timerState.p1BankLeft : timerState.p2BankLeft;
+    if (timerState.moveLeft <= 0 || bankLeft <= 0) {
+      stopMoveTimer();
+      handleTimeExpiry(player);
+    }
   }, 100);
 }
 
 function updateTimerHUD() {
+  if (!els.timerBar) return;
 
   // Match clock (top bar)
   if (els.matchClock) {
@@ -420,17 +426,16 @@ function updateTimerHUD() {
   }
 
   // Move countdown (center of timer bar)
-  const moveLimit = timerState.suddenDeath ? TIMER_CONFIG.SUDDEN_DEATH_MOVE_TIME : TIMER_CONFIG.MOVE_TIME;
   if (els.moveCountdown) {
     const mv = Math.ceil(timerState.moveLeft);
     els.moveCountdown.textContent = mv;
-    const mpct = timerState.moveLeft / moveLimit;
+    const mpct = timerState.moveLeft / TIMER_CONFIG.MOVE_TIME;
     els.moveCountdown.className = 'move-countdown' + (mpct > 0.4 ? '' : mpct > 0.2 ? ' warn' : ' danger');
   }
 
   // Move bar fill
   if (els.moveFill) {
-    const pct = Math.max(0, timerState.moveLeft / moveLimit * 100);
+    const pct = Math.max(0, timerState.moveLeft / TIMER_CONFIG.MOVE_TIME * 100);
     els.moveFill.style.width = pct + '%';
     const mpct = pct / 100;
     els.moveFill.style.background = mpct > 0.4 ? 'var(--accent)' : mpct > 0.2 ? 'var(--p1)' : 'var(--p2)';
@@ -586,9 +591,6 @@ function startGame() {
   updateModeUI();
   hideDialog();
   resetTimers();
-  if (gameMode === 'online') {
-    if (timerState._matchTimer) clearInterval(timerState._matchTimer);
-  }
   // Show timer bar during game
   if (els.timerBar) els.timerBar.classList.remove('hidden');
   hideSuddenDeathOverlay();
