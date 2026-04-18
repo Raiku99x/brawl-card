@@ -359,6 +359,19 @@ function resetTimers() {
     suddenDeath: false,
   };
   updateTimerHUD();
+  if (timerState._matchTimer) clearInterval(timerState._matchTimer);
+  timerState._matchTimer = setInterval(() => {
+    timerState.matchLeft = Math.max(0, timerState.matchLeft - 0.1);
+    if (els.matchClock) {
+      els.matchClock.textContent = fmtTime(timerState.matchLeft);
+      const mpct = timerState.matchLeft / TIMER_CONFIG.MATCH_TIME;
+      els.matchClock.className = 'match-clock' + (mpct > 0.3 ? '' : mpct > 0.15 ? ' warn' : ' danger');
+    }
+    if (timerState.matchLeft <= 0) {
+      clearInterval(timerState._matchTimer);
+      triggerSuddenDeath();
+    }
+  }, 100);
 }
 
 function stopMoveTimer() {
@@ -378,7 +391,6 @@ function startMoveTimer(player) {
 
     const dt = 0.1;
     timerState.moveLeft  = Math.max(0, timerState.moveLeft - dt);
-    timerState.matchLeft = Math.max(0, timerState.matchLeft - dt);
 
     if (player === 'p1') timerState.p1BankLeft = Math.max(0, timerState.p1BankLeft - dt);
     else                  timerState.p2BankLeft = Math.max(0, timerState.p2BankLeft - dt);
@@ -753,7 +765,8 @@ function selectMove(player, moveKey, cardEl) {
   if (timerState.suddenDeath && SUDDEN_DEATH_BANNED.has(moveKey)) return;
 
   // Stop the timer for the choosing player
-  stopMoveTimer();
+  clearInterval(timerState.activeTimer);
+  timerState.activeTimer = null;
 
   if (gameMode === 'online') {
     const myCards = onlineRole === 'p1' ? 'p1' : 'p2';
@@ -1587,6 +1600,7 @@ function isGameOver() { return state.p1.hp <= 0 || state.p2.hp <= 0; }
 
 function endGame() {
   stopMoveTimer();
+  if (timerState._matchTimer) clearInterval(timerState._matchTimer);
   if (els.timerBar) els.timerBar.classList.add('hidden');
   let winnerText, subText;
   const isAI = ['easy', 'medium', 'hard'].includes(gameMode);
