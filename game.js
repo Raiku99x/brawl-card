@@ -1106,11 +1106,21 @@ async function resolveRound() {
   }
 
   // After sudden death round — highest HP wins, no more rounds
-  if (timerState.suddenDeath) {
+if (timerState.suddenDeath) {
     await delay(400);
-    if (state.p1.hp < state.p2.hp) state.p1.hp = 0;
-    else if (state.p2.hp < state.p1.hp) state.p2.hp = 0;
-    else {
+    if (state.p1.hp < state.p2.hp) {
+      showTiedOverlay();
+      await delay(3000);
+      hideTiedOverlay();
+      await delay(300);
+      state.p1.hp = 0;
+    } else if (state.p2.hp < state.p1.hp) {
+      showTiedOverlay();
+      await delay(3000);
+      hideTiedOverlay();
+      await delay(300);
+      state.p2.hp = 0;
+    } else {
       showTiedOverlay();
       await delay(3000);
       hideTiedOverlay();
