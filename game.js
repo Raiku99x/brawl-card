@@ -96,6 +96,7 @@ let state = {
 
 // Track per-round block hit results for sequential turn defence calculation
 let roundBlockHit = { p1: null, p2: null };
+let roundHitResult = { p1: null, p2: null };
 
 // ===== DOM REFS =====
 const screens = {
@@ -288,6 +289,7 @@ function startGame() {
     p2LastMove: null,
   };
   roundBlockHit = { p1: null, p2: null };
+  roundHitResult = { p1: null, p2: null };
   onlinePendingMoves = {};
   els.battleLog.innerHTML = '';
   buildCards('p1');
@@ -676,6 +678,8 @@ async function resolveRound() {
   // ===== ROLL ACCURACY =====
   const p1Hit = rollAccuracy('p1', state.p1.move);
   const p2Hit = rollAccuracy('p2', state.p2.move);
+  roundHitResult.p1 = p1Hit;
+  roundHitResult.p2 = p2Hit;
 
   // Store block hit results for sequential-turn defence checks
   roundBlockHit.p1 = (state.p1.move === 'BLOCK') ? p1Hit : null;
@@ -806,8 +810,10 @@ async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = fa
     const isQuickAtk = defMove.name === 'QUICK ATK';
     if (isQuickAtk) {
       await showDialog(`${attackerLabel}'s COUNTER failed!\n${defenderLabel}'s QUICK ATK was too fast!`, 2000);
-    } else if (!isDefenderAttacking) {
-      await showDialog(`${attackerLabel}'s COUNTER failed!\nNo attack to reflect — turn wasted!`, 2000);
+   } else if (!isDefenderAttacking) {
+  await showDialog(`${attackerLabel}'s COUNTER failed!\nNo attack to reflect — turn wasted!`, 2000);
+    } else if (!roundHitResult[defender]) {
+  await showDialog(`${attackerLabel}'s COUNTER failed!\n${defenderLabel}'s attack missed — no damage to reflect!`, 2000);
     } else {
       await showDialog(`${attackerLabel}'s COUNTER activated!\nReflecting ${actualDmg} damage back!`, 2000);
     }
@@ -928,7 +934,7 @@ function calcDamage(attacker, atkMove, defender, defMove) {
       logEntry(`${attacker.toUpperCase()} COUNTER — no attack to reflect!`, 'log-info');
       return 0;
     }
-    const defenderHit = rollAccuracy(defender, state[defender].move);
+    const defenderHit = roundHitResult[defender];
 if (!defenderHit) {
   logEntry(`${attacker.toUpperCase()} COUNTER — attack missed, nothing to reflect!`, 'log-info');
   return 0;
