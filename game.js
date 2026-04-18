@@ -73,7 +73,7 @@ const TIMER_CONFIG = {
   MOVE_TIME:  15,
   SUDDEN_DEATH_MOVE_TIME: 30,
   BANK_TIME:  180,  // 3 minutes per player
-  MATCH_TIME: 10,  // 6 minutes total
+  MATCH_TIME: 360,  // 6 minutes total
 };
 
 // Sudden death moves — Block and Heal are locked out
