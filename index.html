@@ -93,6 +93,8 @@
               <p><span class="highlight">HEAL:</span> +6 HP but max HP drops by 2. (e.g. 5/10 → 8/8)</p>
               <p><span class="highlight">BLOCK:</span> Reduces incoming damage by 2. Great against HEAVY ATK!</p>
               <p><span class="highlight">TIE PRIORITY:</span> Both actions happen simultaneously.</p>
+              <p><span class="highlight">TIMERS:</span> 15s per turn, 3min player bank, 6min match limit. Time out = Auto ATK!</p>
+              <p><span class="highlight">SUDDEN DEATH:</span> If match timer hits 0 with tied HP, one final round. Block &amp; Heal banned. Highest HP wins!</p>
               <p><span class="highlight">CPU DIFFICULTIES:</span> Easy = random. Medium = smart logic. Hard = reads your patterns.</p>
               <p><span class="highlight">ONLINE:</span> Create a room, share the 4-letter code. Both pick secretly — resolves automatically!</p>
             </div>
@@ -100,7 +102,7 @@
           </div>
         </div>
 
-        <!-- GAME — top screen: arena only, NO dialog here -->
+        <!-- GAME — top screen: arena only -->
         <div id="screen-game" class="screen">
           <div class="top-bar">
             <div class="fighter-hud p1-hud">
@@ -111,6 +113,8 @@
             <div class="round-info">
               <div class="round-label">ROUND</div>
               <div class="round-num" id="round-num">1</div>
+              <!-- MATCH CLOCK lives here -->
+              <div class="match-clock" id="match-clock">6:00</div>
               <div class="mode-badge" id="mode-badge"></div>
             </div>
             <div class="fighter-hud p2-hud">
@@ -164,7 +168,42 @@
 
         <div id="phase-banner" class="phase-banner hidden">CHOOSE YOUR MOVE</div>
 
-        <!-- DIALOG NOW LIVES HERE — above cards, inside bottom screen -->
+        <!-- ══ TRIPLE TIMER BAR ══ -->
+        <!-- Sits between phase banner and dialog. Hidden on title/result. -->
+        <div id="timer-bar" class="timer-bar hidden">
+          <!-- P1 Bank (left) -->
+          <div class="bank-block">
+            <div class="bank-header">
+              <span class="bank-label p1-color">P1 BANK</span>
+              <span class="bank-val" id="p1-bank-val">3:00</span>
+            </div>
+            <div class="bank-track">
+              <div class="bank-fill p1" id="p1-bank-fill"></div>
+            </div>
+          </div>
+
+          <!-- Move countdown (center) -->
+          <div class="move-timer-block">
+            <div class="move-countdown" id="move-countdown">15</div>
+            <div class="move-track">
+              <div class="move-fill" id="move-fill"></div>
+            </div>
+            <div class="move-timer-label">TURN</div>
+          </div>
+
+          <!-- P2 Bank (right) -->
+          <div class="bank-block right">
+            <div class="bank-header right">
+              <span class="bank-val right" id="p2-bank-val">3:00</span>
+              <span class="bank-label p2-color">P2 BANK</span>
+            </div>
+            <div class="bank-track">
+              <div class="bank-fill p2" id="p2-bank-fill"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- DIALOG -->
         <div id="poke-dialog" class="poke-dialog hidden">
           <div id="poke-dialog-text" class="poke-dialog-text"></div>
           <div id="poke-dialog-arrow" class="poke-dialog-arrow hidden">▼</div>
@@ -238,6 +277,21 @@
 </div><!-- /console-shell -->
 
 <div id="hit-overlay" class="hit-overlay"></div>
+
+<!-- ══ SUDDEN DEATH OVERLAY ══ -->
+<!-- Full-screen dramatic popup when match clock hits 0 with tied HP -->
+<div id="sd-overlay" class="sd-overlay hidden">
+  <div class="sd-content">
+    <div class="sd-skull">💀</div>
+    <div class="sd-title">SUDDEN DEATH</div>
+    <div class="sd-rule-row">
+      <span class="sd-banned-pill">🛡️ BLOCK — BANNED</span>
+      <span class="sd-banned-pill">💚 HEAL — BANNED</span>
+    </div>
+    <div class="sd-sub">Time is up. One final round.<br>Highest HP after resolve wins.</div>
+    <div class="sd-sub sd-quick-note">Quick ATK still beats ATK via priority.</div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="game.js"></script>

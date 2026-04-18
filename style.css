@@ -2,6 +2,7 @@
    BRAWL CARDS — style.css
    NDS DUAL-SCREEN CONSOLE DESIGN
    Dark / Neon Colorway
+   + TRIPLE-TIMER SYSTEM
    ============================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Oswald:wght@400;600;700&family=Share+Tech+Mono&family=Press+Start+2P&display=swap');
@@ -40,6 +41,12 @@
   --hinge: #0e0e18;
   --hinge-edge: #1e1e30;
   --hinge-neon: #4af0c8;
+
+  /* Timer colors */
+  --timer-ok:   #4af0c8;
+  --timer-warn: #f7c948;
+  --timer-danger: #e03c3c;
+  --sd-color:   #e03c3c;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -53,7 +60,6 @@ body {
   font-family: var(--font-body);
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
-  /* REMOVED touch-action: manipulation — allows pinch-zoom on mobile */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -197,7 +203,6 @@ body {
 .bezel-corner.br { bottom: 3px; right: 3px; border-width: 0 2px 2px 0; border-radius: 0 0 2px 0; }
 
 /* ---- GAME VIEWPORT ---- */
-/* FIXED: tall enough to show sprites + log + dialog without cutting anything */
 .console-screen {
   position: relative;
   background: var(--bg);
@@ -313,7 +318,6 @@ body {
   display: flex;
   flex-direction: column;
 }
-/* FIXED: let content size naturally, no forced min-height creating empty space */
 .nds-info-screen.nds-card-screen {
   min-height: 0;
 }
@@ -791,9 +795,27 @@ body {
   color: var(--muted);
 }
 
+/* ROUND INFO + MATCH CLOCK */
 .round-info { text-align: center; flex-shrink: 0; width: clamp(54px, 8vw, 70px); }
 .round-label { font-family: var(--font-mono); font-size: 0.36rem; color: var(--muted); letter-spacing: 0.1em; }
 .round-num   { font-family: var(--font-title); font-size: clamp(1rem, 3.2vw, 1.5rem); color: var(--text); line-height: 1; }
+
+/* MATCH CLOCK — top bar center, below round number */
+.match-clock {
+  font-family: var(--font-mono);
+  font-size: clamp(0.52rem, 1.5vw, 0.72rem);
+  font-weight: 700;
+  color: var(--timer-ok);
+  letter-spacing: 0.04em;
+  line-height: 1;
+  margin-top: 1px;
+  transition: color 0.4s;
+}
+.match-clock.warn   { color: var(--timer-warn); animation: matchWarn 1s ease-in-out infinite alternate; }
+.match-clock.danger { color: var(--timer-danger); animation: matchDanger 0.5s ease-in-out infinite alternate; }
+@keyframes matchWarn   { from { opacity: 0.7; } to { opacity: 1; } }
+@keyframes matchDanger { from { opacity: 0.4; transform: scale(1); } to { opacity: 1; transform: scale(1.08); } }
+
 .mode-badge {
   font-family: var(--font-mono);
   font-size: clamp(0.28rem, 0.85vw, 0.38rem);
@@ -960,7 +982,6 @@ body {
   padding: 0 8px 6px;
 }
 
-/* FIXED: battle log — exactly 6 lines tall, then scroll */
 .battle-log {
   background: rgba(0,0,0,0.72);
   border: 1px solid var(--border);
@@ -1002,10 +1023,230 @@ body {
 .phase-banner.p2-turn    { background: var(--p2); color: #fff; }
 .phase-banner.cpu-turn   { background: var(--cpu); color: #fff; }
 .phase-banner.online-wait { background: var(--online-dark); color: var(--online); }
+/* Sudden death banner */
+.phase-banner.sd-phase   { background: var(--p2-dark); color: #ff8888; animation: sdBannerPulse 0.6s ease-in-out infinite alternate; }
+@keyframes sdBannerPulse { from { background: var(--p2-dark); } to { background: #3a0808; } }
 .phase-banner.hidden { display: none; }
 @keyframes bannerIn {
   from { opacity: 0; transform: scaleY(0); }
   to   { opacity: 1; transform: scaleY(1); }
+}
+
+/* =============================================
+   TRIPLE-TIMER BAR  (bottom screen, above dialog)
+   ============================================= */
+.timer-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 5px;
+  background: #09090f;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.timer-bar.hidden { display: none; }
+
+/* Player bank block */
+.bank-block {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.bank-block.right { align-items: flex-end; }
+
+.bank-header {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.bank-header.right { flex-direction: row-reverse; }
+
+.bank-label {
+  font-family: var(--font-mono);
+  font-size: clamp(0.34rem, 1vw, 0.44rem);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.bank-val {
+  font-family: var(--font-mono);
+  font-size: clamp(0.38rem, 1.1vw, 0.5rem);
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+  transition: color 0.3s;
+}
+.bank-val.warn   { color: var(--timer-warn); }
+.bank-val.danger { color: var(--timer-danger); animation: valPulse 0.5s ease-in-out infinite alternate; }
+@keyframes valPulse { from { opacity: 0.6; } to { opacity: 1; } }
+
+.bank-track {
+  width: 100%;
+  height: 5px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.bank-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.25s linear, background 0.4s;
+}
+.bank-fill.p1        { background: var(--p1); }
+.bank-fill.p2        { background: var(--p2); }
+.bank-fill.warn      { background: var(--timer-warn) !important; }
+.bank-fill.danger    { background: var(--timer-danger) !important; }
+
+/* Move countdown (center) */
+.move-timer-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 46px;
+}
+.move-countdown {
+  font-family: var(--font-title);
+  font-size: clamp(1.2rem, 3.5vw, 1.8rem);
+  line-height: 1;
+  color: var(--timer-ok);
+  transition: color 0.3s;
+  text-shadow: 0 0 8px currentColor;
+}
+.move-countdown.warn   { color: var(--timer-warn); }
+.move-countdown.danger {
+  color: var(--timer-danger);
+  animation: moveDanger 0.35s ease-in-out infinite alternate;
+}
+@keyframes moveDanger {
+  from { transform: scale(1);    opacity: 0.7; }
+  to   { transform: scale(1.12); opacity: 1; }
+}
+
+.move-track {
+  width: 40px;
+  height: 3px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+.move-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--timer-ok);
+  transition: width 0.12s linear, background 0.3s;
+}
+.move-timer-label {
+  font-family: var(--font-mono);
+  font-size: 0.32rem;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  margin-top: 1px;
+}
+
+/* =============================================
+   SUDDEN DEATH OVERLAY
+   ============================================= */
+.sd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(0, 0, 0, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.sd-overlay.active  { opacity: 1; }
+.sd-overlay.hidden  { display: none; }
+
+.sd-content {
+  text-align: center;
+  padding: 28px 24px;
+  border: 2px solid var(--sd-color);
+  background: #0d0005;
+  max-width: 280px;
+  width: 90%;
+  animation: sdPop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+@keyframes sdPop {
+  from { transform: scale(0.5) rotate(-4deg); opacity: 0; }
+  to   { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+.sd-skull {
+  font-size: 2.8rem;
+  line-height: 1;
+  margin-bottom: 8px;
+  animation: sdSkull 0.6s ease-in-out infinite alternate;
+}
+@keyframes sdSkull { from { transform: scale(1) rotate(-5deg); } to { transform: scale(1.1) rotate(5deg); } }
+
+.sd-title {
+  font-family: var(--font-title);
+  font-size: clamp(1.4rem, 6vw, 2rem);
+  color: var(--timer-danger);
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 20px var(--timer-danger), 2px 2px 0 #000;
+  margin-bottom: 12px;
+}
+
+.sd-rule-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.sd-banned-pill {
+  font-family: var(--font-mono);
+  font-size: clamp(0.46rem, 1.4vw, 0.58rem);
+  color: #ff6666;
+  background: rgba(224, 60, 60, 0.15);
+  border: 1px solid rgba(224, 60, 60, 0.4);
+  padding: 4px 8px;
+  letter-spacing: 0.04em;
+  /* strikethrough feel */
+  text-decoration: line-through;
+  text-decoration-color: rgba(224,60,60,0.6);
+}
+
+.sd-sub {
+  font-family: var(--font-mono);
+  font-size: clamp(0.44rem, 1.3vw, 0.56rem);
+  color: var(--muted);
+  line-height: 1.6;
+  letter-spacing: 0.04em;
+}
+.sd-quick-note {
+  font-size: clamp(0.38rem, 1.1vw, 0.48rem);
+  color: #3a3a58;
+  margin-top: 6px;
+}
+
+/* Banned card style */
+.card.sd-banned {
+  opacity: 0.18 !important;
+  pointer-events: none !important;
+  filter: grayscale(1) !important;
+  position: relative;
+}
+.sd-ban-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.38rem;
+  color: var(--p2);
+  letter-spacing: 0.06em;
+  background: rgba(224,60,60,0.08);
+  z-index: 4;
 }
 
 /* SELECTION AREA */
@@ -1161,7 +1402,7 @@ body {
   50%       { box-shadow: 0 0 0 5px rgba(247,201,72,0); }
 }
 
-/* POKÉMON DIALOGUE — now lives in bottom screen, above cards */
+/* POKÉMON DIALOGUE */
 .poke-dialog {
   background: #f2f2e6;
   border: 2px solid #2a2a2a;
@@ -1171,7 +1412,6 @@ body {
   margin: 0;
   position: relative;
   flex-shrink: 0;
-  /* sits between phase-banner and selection-area */
   order: 0;
   box-shadow:
     inset 0 0 0 1px #f2f2e6,
@@ -1179,7 +1419,6 @@ body {
     0 2px 6px rgba(0,0,0,0.5);
   cursor: pointer;
   z-index: 5;
-  /* slide down animation */
   animation: dialogSlideIn 0.18s ease;
 }
 @keyframes dialogSlideIn {
@@ -1197,7 +1436,6 @@ body {
   color: #111;
   line-height: 1.5;
   white-space: pre-line;
-  /* 2-line max */
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -1354,6 +1592,8 @@ body {
   .card { padding: 2px 3px; }
   .poke-dialog { min-height: 34px; padding: 4px 8px; }
   .fighter-sprite { width: clamp(70px, 14vw, 100px); height: clamp(95px, 18vw, 135px); }
+  .timer-bar { padding: 3px 6px; }
+  .move-countdown { font-size: 1rem; }
 }
 
 /* =============================================
@@ -1367,12 +1607,10 @@ body {
 
   .console-shell { width: 100%; }
 
-  /* FIXED: top screen — tall enough for sprites + log + dialog, nothing cut */
   .console-screen {
     height: clamp(300px, 48dvh, 400px);
   }
 
-  /* Sprites: solid size */
   .fighter-sprite {
     width: clamp(118px, 30vw, 155px);
     height: clamp(155px, 38vw, 200px);
@@ -1383,7 +1621,6 @@ body {
     align-items: center;
   }
 
-  /* Battle log: exactly 6 lines */
   .battle-log {
     font-size: 0.60rem;
     line-height: 1.45;
@@ -1392,32 +1629,50 @@ body {
     padding: 3px 7px;
   }
 
-  /* Bottom info screen: shrinks to content, no forced empty space */
   .nds-info-screen.nds-card-screen {
     min-height: 0;
   }
 
-  /* Phase banner */
+  /* Timer bar on mobile */
+  .timer-bar {
+    padding: 5px 8px 4px;
+    gap: 5px;
+  }
+  .move-countdown {
+    font-size: 1.6rem;
+  }
+  .bank-label {
+    font-size: 0.52rem;
+  }
+  .bank-val {
+    font-size: 0.56rem;
+  }
+  .move-timer-label {
+    font-size: 0.38rem;
+  }
+
+  /* Match clock on mobile */
+  .match-clock {
+    font-size: 0.65rem;
+  }
+
   .phase-banner {
     font-size: 0.90rem;
     padding: 8px 8px;
     letter-spacing: 0.05em;
   }
 
-  /* Player panel */
   .player-panel {
     padding: 8px 7px 8px;
     gap: 6px;
   }
 
-  /* Panel title */
   .player-panel-title {
     font-size: 0.85rem;
     letter-spacing: 0.02em;
     margin-bottom: 3px;
   }
 
-  /* Cards: 3-col grid */
   .cards-row {
     display: grid !important;
     grid-template-columns: repeat(3, 1fr) !important;
@@ -1471,7 +1726,6 @@ body {
     gap: 6px !important;
   }
 
-  /* Resolve button */
   .btn-resolve {
     font-size: 0.88rem;
     padding: 11px 16px;
@@ -1485,14 +1739,12 @@ body {
     padding: 6px 8px;
   }
 
-  /* HUD */
   .top-bar { padding: 5px 8px; }
   .fighter-name { font-size: 0.78rem; }
   .hp-text { font-size: 0.60rem; }
   .round-num { font-size: 1.2rem; }
   .hp-bar-wrap { height: 8px; }
 
-  /* Poke dialog: compact, bottom screen */
   .poke-dialog { padding: 7px 12px 8px; }
   .poke-dialog-text {
     font-size: 0.72rem;
@@ -1501,7 +1753,14 @@ body {
     min-height: calc(1.5em * 2);
   }
 
-  /* Hide decorative chrome to reclaim space */
+  /* SD overlay on mobile */
+  .sd-content {
+    padding: 20px 16px;
+    max-width: 260px;
+  }
+  .sd-skull { font-size: 2.2rem; }
+  .sd-title { font-size: 1.4rem; }
+
   .nds-controls,
   .console-speakers,
   .console-bottom-grip,
@@ -1539,4 +1798,6 @@ body {
   .card-name { font-size: 0.68rem !important; }
   .card-stats { font-size: 0.47rem !important; }
   .stat-acc { font-size: 0.45rem !important; }
+
+  .move-countdown { font-size: 1.3rem; }
 }
