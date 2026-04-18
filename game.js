@@ -366,16 +366,12 @@ function resetTimers() {
       updateTimerHUD();
       if (timerState.matchLeft <= 0) {
       clearInterval(timerState._matchTimer);
-      if (state.phase === 'resolve' || state.phase === 'both-chosen') {
-        const checkDone = setInterval(() => {
-          if (state.phase !== 'resolve' && state.phase !== 'both-chosen') {
-            clearInterval(checkDone);
-            triggerSuddenDeath();
-          }
-        }, 200);
-      } else {
-        triggerSuddenDeath();
-      }
+      const waitForRound = setInterval(() => {
+        if (state.phase === 'p1-choose') {
+          clearInterval(waitForRound);
+          triggerSuddenDeath();
+        }
+      }, 200);
     }
     }, 100);
   }
