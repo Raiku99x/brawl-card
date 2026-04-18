@@ -928,9 +928,14 @@ function calcDamage(attacker, atkMove, defender, defMove) {
       logEntry(`${attacker.toUpperCase()} COUNTER — no attack to reflect!`, 'log-info');
       return 0;
     }
-    const defDmg = defMove.dmg || 0;
-    logEntry(`${attacker.toUpperCase()} COUNTERS — reflects ${defDmg * 2} dmg!`, 'log-dmg');
-    return defDmg * 2;
+    const defenderHit = rollAccuracy(defender, state[defender].move);
+if (!defenderHit) {
+  logEntry(`${attacker.toUpperCase()} COUNTER — attack missed, nothing to reflect!`, 'log-info');
+  return 0;
+}
+const defDmg = defMove.dmg || 0;
+logEntry(`${attacker.toUpperCase()} COUNTERS — reflects ${defDmg * 2} dmg!`, 'log-dmg');
+return defDmg * 2;
   }
   return atkMove.dmg || 0;
 }
