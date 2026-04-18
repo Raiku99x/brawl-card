@@ -388,25 +388,6 @@ function stopMoveTimer() {
   }
 }
 
-if (timerState._matchTimer) clearInterval(timerState._matchTimer);
-  let lastMatchTick = Date.now();
-  timerState._matchTimer = setInterval(() => {
-    const now = Date.now();
-    const dt = (now - lastMatchTick) / 1000;
-    lastMatchTick = now;
-    timerState.matchLeft = Math.max(0, timerState.matchLeft - dt);
-    updateTimerHUD();
-    if (timerState.matchLeft <= 0) {
-      clearInterval(timerState._matchTimer);
-      const waitForRound = setInterval(() => {
-        if (state.phase === 'p1-choose') {
-          clearInterval(waitForRound);
-          triggerSuddenDeath();
-        }
-      }, 200);
-    }
-  }, 100);
-
 function updateTimerHUD() {
   if (!els.timerBar) return;
 
