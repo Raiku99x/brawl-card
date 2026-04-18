@@ -421,10 +421,10 @@ function updateTimerHUD() {
   }
 
   // Move countdown (center of timer bar)
+  const moveLimit = timerState.suddenDeath ? TIMER_CONFIG.SUDDEN_DEATH_MOVE_TIME : TIMER_CONFIG.MOVE_TIME;
   if (els.moveCountdown) {
     const mv = Math.ceil(timerState.moveLeft);
     els.moveCountdown.textContent = mv;
-    const moveLimit = timerState.suddenDeath ? TIMER_CONFIG.SUDDEN_DEATH_MOVE_TIME : TIMER_CONFIG.MOVE_TIME;
     const mpct = timerState.moveLeft / moveLimit;
     els.moveCountdown.className = 'move-countdown' + (mpct > 0.4 ? '' : mpct > 0.2 ? ' warn' : ' danger');
   }
