@@ -365,9 +365,18 @@ function resetTimers() {
       timerState.matchLeft = Math.max(0, timerState.matchLeft - 0.1);
       updateTimerHUD();
       if (timerState.matchLeft <= 0) {
-        clearInterval(timerState._matchTimer);
+      clearInterval(timerState._matchTimer);
+      if (state.phase === 'resolve' || state.phase === 'both-chosen') {
+        const checkDone = setInterval(() => {
+          if (state.phase !== 'resolve' && state.phase !== 'both-chosen') {
+            clearInterval(checkDone);
+            triggerSuddenDeath();
+          }
+        }, 200);
+      } else {
         triggerSuddenDeath();
       }
+    }
     }, 100);
   }
 
