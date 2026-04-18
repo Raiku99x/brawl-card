@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes"/>
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -100,7 +100,7 @@
           </div>
         </div>
 
-        <!-- GAME -->
+        <!-- GAME — top screen: arena only, NO dialog here -->
         <div id="screen-game" class="screen">
           <div class="top-bar">
             <div class="fighter-hud p1-hud">
@@ -135,10 +135,6 @@
               <div id="battle-log" class="battle-log"></div>
             </div>
           </div>
-          <div id="poke-dialog" class="poke-dialog hidden">
-            <div id="poke-dialog-text" class="poke-dialog-text"></div>
-            <div id="poke-dialog-arrow" class="poke-dialog-arrow hidden">▼</div>
-          </div>
         </div>
 
         <!-- RESULT -->
@@ -168,15 +164,21 @@
 
         <div id="phase-banner" class="phase-banner hidden">CHOOSE YOUR MOVE</div>
 
+        <!-- DIALOG NOW LIVES HERE — above cards, inside bottom screen -->
+        <div id="poke-dialog" class="poke-dialog hidden">
+          <div id="poke-dialog-text" class="poke-dialog-text"></div>
+          <div id="poke-dialog-arrow" class="poke-dialog-arrow hidden">▼</div>
+        </div>
+
         <div class="selection-area" id="selection-area">
           <div class="player-panel" id="p1-panel">
-            <div class="player-panel-title p1-color" id="p1-panel-title">⚡ P1 — CHOOSE</div>
+            <div class="player-panel-title p1-color" id="p1-panel-title">⚡ P1 — PICK</div>
             <div class="cards-row" id="p1-cards"></div>
             <div class="selected-display" id="p1-selected-display">— NOT YET CHOSEN —</div>
           </div>
           <div class="panel-divider"><div class="divider-icon">⚔</div></div>
           <div class="player-panel" id="p2-panel">
-            <div class="player-panel-title p2-color" id="p2-panel-title">🔥 P2 — CHOOSE</div>
+            <div class="player-panel-title p2-color" id="p2-panel-title">🔥 P2 — PICK</div>
             <div class="cards-row" id="p2-cards"></div>
             <div class="selected-display" id="p2-selected-display">— NOT YET CHOSEN —</div>
           </div>

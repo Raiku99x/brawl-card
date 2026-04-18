@@ -13,6 +13,8 @@
 //     - Quick ATK displays ACC:120% (raw, uncapped)
 //     - Counter floating number shows -N (e.g. -4) not ×N
 //     - ACC merged inline with stats line on cards
+//     - Online multiplayer: retry ping loop, no stacked delays
+//     - Poke dialog moved to bottom screen, replaces phase banner while active
 // ============================================
 
 // ─── SUPABASE CONFIG ───────────────────────
@@ -39,18 +41,15 @@ const MOVES = {
 const MOVE_KEYS = Object.keys(MOVES);
 
 // ===== ACCURACY SYSTEM =====
-// Raw accuracy values — QUICK_ATK is 1.20 (120%) so future debuffs can reduce it.
-// Anything >= 1.0 always hits in rollAccuracy(), but we display the raw % on cards.
 const MOVE_ACCURACY = {
   ATK:       1.00,
-  QUICK_ATK: 1.20,   // displays as 120%; still always hits until debuffed below 100%
+  QUICK_ATK: 1.20,
   HEAVY_ATK: 0.80,
-  BLOCK:     1.00,   // overridden by streak logic
+  BLOCK:     1.00,
   COUNTER:   1.00,
   HEAL:      1.00,
 };
 
-// Block accuracy per consecutive-block streak (0-indexed)
 const BLOCK_ACC_STEPS = [1.00, 0.80, 0.50, 0.10, 0.01];
 
 function getBlockAccuracy(streak) {
@@ -62,13 +61,11 @@ function getMoveAccuracy(player, moveKey) {
   return MOVE_ACCURACY[moveKey] || 1.0;
 }
 
-// Hit roll: values >= 1.0 always hit; below 1.0 are probabilistic
 function rollAccuracy(player, moveKey) {
   const acc = getMoveAccuracy(player, moveKey);
   return acc >= 1.0 ? true : Math.random() < acc;
 }
 
-// Display the raw percentage (can be > 100%)
 function getAccPct(player, moveKey) {
   return Math.round(getMoveAccuracy(player, moveKey) * 100);
 }
@@ -83,6 +80,7 @@ let onlineChannel = null;
 let onlinePendingMoves = {};
 let onlineOpponentConnected = false;
 let onlineJoinTimeout = null;
+let pingRetryInterval = null;
 
 // ===== GAME STATE =====
 let state = {
@@ -94,7 +92,6 @@ let state = {
   p2LastMove: null,
 };
 
-// Track per-round block hit results for sequential turn defence calculation
 let roundBlockHit = { p1: null, p2: null };
 let roundHitResult = { p1: null, p2: null };
 
@@ -195,49 +192,77 @@ function showRoomStatus(msg, type = 'waiting') {
   els.roomStatus.classList.remove('hidden');
 }
 
+// ===== ONLINE: CREATE ROOM =====
 async function createOnlineRoom() {
   const code = generateRoomCode();
-  onlineRoom = code; onlineRole = 'p1';
+  onlineRoom = code;
+  onlineRole = 'p1';
   showRoomStatus(`ROOM: ${code} — Share this code!`, 'waiting');
   await subscribeToRoom(code);
 }
 
+// ===== ONLINE: JOIN ROOM =====
 async function joinOnlineRoom(code) {
   code = code.toUpperCase().trim();
   showRoomStatus(`Connecting to ${code}...`, 'waiting');
-  onlineRoom = code; onlineRole = 'p2';
+  onlineRoom = code;
+  onlineRole = 'p2';
+
   await subscribeToRoom(code);
-  setTimeout(() => sendOnlineEvent('ping', { role: 'p2' }), 600);
-  onlineJoinTimeout = setTimeout(() => {
-    if (!onlineOpponentConnected) {
+
+  let pingCount = 0;
+  const MAX_PINGS = 20;
+
+  pingRetryInterval = setInterval(() => {
+    if (onlineOpponentConnected) {
+      clearInterval(pingRetryInterval);
+      pingRetryInterval = null;
+      return;
+    }
+    if (pingCount >= MAX_PINGS) {
+      clearInterval(pingRetryInterval);
+      pingRetryInterval = null;
       showRoomStatus(`Room "${code}" not found or host left!`, 'error');
       leaveOnlineRoom();
+      return;
     }
-  }, 5000);
+    sendOnlineEvent('ping', { role: 'p2' });
+    pingCount++;
+  }, 400);
 }
 
+// ===== SUBSCRIBE TO ROOM =====
 function subscribeToRoom(code) {
   return new Promise((resolve) => {
     if (onlineChannel) { onlineChannel.unsubscribe(); onlineChannel = null; }
+
     onlineChannel = supabaseClient.channel(`brawl:${code}`, {
       config: { broadcast: { self: false, ack: false } }
     });
+
     onlineChannel
       .on('broadcast', { event: 'ping' }, () => {
         if (onlineRole !== 'p1') return;
+        if (onlineOpponentConnected) return;
         onlineOpponentConnected = true;
-        clearTimeout(onlineJoinTimeout);
-        showRoomStatus(`Opponent connected! Starting...`, 'connected');
-        setTimeout(() => { sendOnlineEvent('pong', {}); gameMode = 'online'; startGame(); showScreen('game'); }, 600);
+        showRoomStatus('Opponent connected! Starting...', 'connected');
+        sendOnlineEvent('pong', {});
+        gameMode = 'online';
+        startGame();
+        showScreen('game');
       })
       .on('broadcast', { event: 'pong' }, () => {
         if (onlineRole !== 'p2') return;
+        if (onlineOpponentConnected) return;
         onlineOpponentConnected = true;
-        clearTimeout(onlineJoinTimeout);
-        showRoomStatus(`Connected! Starting...`, 'connected');
-        setTimeout(() => { gameMode = 'online'; startGame(); showScreen('game'); }, 600);
+        clearInterval(pingRetryInterval);
+        pingRetryInterval = null;
+        showRoomStatus('Connected! Starting...', 'connected');
+        gameMode = 'online';
+        startGame();
+        showScreen('game');
       })
-      .on('broadcast', { event: 'move' }, ({ payload }) => { handleOnlineMove(payload.role, payload.move); })
+      .on('broadcast', { event: 'move' }, ({ payload }) => { handleOnlineMove(payload.role, payload.move, payload.hitRoll); })
       .on('broadcast', { event: 'rematch' }, () => { startGame(); showScreen('game'); })
       .subscribe((status) => { if (status === 'SUBSCRIBED') resolve(); });
   });
@@ -248,15 +273,19 @@ function sendOnlineEvent(event, payload) {
   onlineChannel.send({ type: 'broadcast', event, payload });
 }
 
-function handleOnlineMove(role, moveKey) {
-  onlinePendingMoves[role] = moveKey;
+function handleOnlineMove(role, moveKey, hitRoll) {
+  onlinePendingMoves[role] = { move: moveKey, hitRoll };
   if (role !== onlineRole) {
     els.p2SelDisp.textContent = '✓ OPPONENT LOCKED IN';
     els.p2SelDisp.style.color = 'var(--online)';
   }
   if (onlinePendingMoves.p1 && onlinePendingMoves.p2) {
-    state.p1.move = onlinePendingMoves.p1;
-    state.p2.move = onlinePendingMoves.p2;
+    state.p1.move = onlinePendingMoves.p1.move;
+    state.p2.move = onlinePendingMoves.p2.move;
+    state._onlineHitRolls = {
+      p1: onlinePendingMoves.p1.hitRoll,
+      p2: onlinePendingMoves.p2.hitRoll,
+    };
     onlinePendingMoves = {};
     els.onlineWaiting.classList.add('hidden');
     showBothPanels();
@@ -266,9 +295,14 @@ function handleOnlineMove(role, moveKey) {
 }
 
 function leaveOnlineRoom() {
+  clearInterval(pingRetryInterval);
+  pingRetryInterval = null;
   clearTimeout(onlineJoinTimeout);
   if (onlineChannel) { onlineChannel.unsubscribe(); onlineChannel = null; }
-  onlineRoom = null; onlineRole = null; onlinePendingMoves = {}; onlineOpponentConnected = false;
+  onlineRoom = null;
+  onlineRole = null;
+  onlinePendingMoves = {};
+  onlineOpponentConnected = false;
 }
 
 function generateRoomCode() {
@@ -349,8 +383,29 @@ function applyOnlinePanelLayout() {
 }
 
 // ===== POKÉMON DIALOGUE =====
+// Dialog now lives in the bottom screen.
+// While dialog is showing: hide the phase banner.
+// When dialog hides: restore the phase banner.
 let dialogQueue = [];
 let isDialogBusy = false;
+let _savedBannerState = null; // { text, classes } — restored when dialog closes
+
+function _hideBannerForDialog() {
+  // Save current banner state so we can restore it
+  _savedBannerState = {
+    text: els.phaseBanner.textContent,
+    className: els.phaseBanner.className,
+  };
+  els.phaseBanner.classList.add('hidden');
+}
+
+function _restoreBannerAfterDialog() {
+  if (_savedBannerState) {
+    els.phaseBanner.className = _savedBannerState.className;
+    els.phaseBanner.textContent = _savedBannerState.text;
+    _savedBannerState = null;
+  }
+}
 
 function showDialog(text, duration = 0) {
   return new Promise(resolve => {
@@ -360,26 +415,41 @@ function showDialog(text, duration = 0) {
 }
 
 async function processDialogQueue() {
-  if (dialogQueue.length === 0) { isDialogBusy = false; return; }
+  if (dialogQueue.length === 0) {
+    isDialogBusy = false;
+    // All dialogs done — restore the banner
+    _restoreBannerAfterDialog();
+    return;
+  }
   isDialogBusy = true;
+
+  // Hide banner the first time a dialog opens in this batch
+  if (_savedBannerState === null) {
+    _hideBannerForDialog();
+  }
+
   const { text, duration, resolve } = dialogQueue.shift();
   els.pokeDialog.classList.remove('hidden');
   els.pokeDialogArrow.classList.add('hidden');
   els.pokeDialogText.textContent = '';
+
   for (let i = 0; i < text.length; i++) {
     els.pokeDialogText.textContent += text[i];
     await delay(22);
   }
+
   if (duration > 0) {
     await delay(duration);
-    resolve(); processDialogQueue();
+    resolve();
+    processDialogQueue();
   } else {
     els.pokeDialogArrow.classList.remove('hidden');
     const next = () => {
       els.pokeDialog.removeEventListener('click', next);
       els.pokeDialog.removeEventListener('touchend', next);
       document.removeEventListener('keydown', next);
-      resolve(); processDialogQueue();
+      resolve();
+      processDialogQueue();
     };
     els.pokeDialog.addEventListener('click', next);
     els.pokeDialog.addEventListener('touchend', next, { passive: true });
@@ -389,10 +459,17 @@ async function processDialogQueue() {
 
 function hideDialog() {
   els.pokeDialog.classList.add('hidden');
-  dialogQueue = []; isDialogBusy = false;
+  dialogQueue = [];
+  isDialogBusy = false;
+  // Restore banner whenever dialog is force-closed (new round / game start)
+  _restoreBannerAfterDialog();
 }
 
 function setDialogImmediate(text) {
+  // Hide banner when showing dialog immediately
+  if (_savedBannerState === null) {
+    _hideBannerForDialog();
+  }
   els.pokeDialog.classList.remove('hidden');
   els.pokeDialogArrow.classList.add('hidden');
   els.pokeDialogText.textContent = text;
@@ -419,7 +496,6 @@ function buildCards(player) {
   });
 }
 
-// ===== STAT LINE (stats + ACC merged) =====
 function buildStatLine(player, key) {
   const move = MOVES[key];
   const parts = [];
@@ -432,7 +508,6 @@ function buildStatLine(player, key) {
   const priSign = move.priority >= 0 ? '+' : '';
   parts.push(`<span>P:${priSign}${move.priority}</span>`);
 
-  // ACC inline — always last
   parts.push(buildAccSpan(player, key));
 
   return parts.join(' ');
@@ -447,12 +522,10 @@ function buildAccSpan(player, key) {
     return `<span class="stat-acc ${cls}">ACC:${pct}%${streakSuffix}</span>`;
   }
   const rawPct = Math.round((MOVE_ACCURACY[key] || 1.0) * 100);
-  // >100% = always hits = green; 85-99 = yellow; <85 = red
   const cls = rawPct >= 100 ? 'acc-high' : rawPct >= 85 ? 'acc-mid' : 'acc-low';
   return `<span class="stat-acc ${cls}">ACC:${rawPct}%</span>`;
 }
 
-// Refresh stats line for all cards of a player (e.g. after block streak changes)
 function refreshAccDisplay(player) {
   const container = player === 'p1' ? els.p1Cards : els.p2Cards;
   container.querySelectorAll('.card').forEach(card => {
@@ -477,12 +550,15 @@ function selectMove(player, moveKey, cardEl) {
     dispEl.textContent = `✓ ${MOVES[moveKey].name}`;
     dispEl.style.color = player === 'p1' ? 'var(--p1)' : 'var(--p2)';
     lockCards(player);
-    sendOnlineEvent('move', { role: onlineRole, move: moveKey });
-    onlinePendingMoves[onlineRole] = moveKey;
+    const myHitRoll = rollAccuracy(player, moveKey);
+    sendOnlineEvent('move', { role: onlineRole, move: moveKey, hitRoll: myHitRoll });
+    onlinePendingMoves[onlineRole] = { move: moveKey, hitRoll: myHitRoll };
     els.onlineWaiting.classList.remove('hidden');
     els.phaseBanner.classList.add('hidden');
     if (onlinePendingMoves.p1 && onlinePendingMoves.p2) {
-      state.p1.move = onlinePendingMoves.p1; state.p2.move = onlinePendingMoves.p2;
+      state.p1.move = onlinePendingMoves.p1.move;
+      state.p2.move = onlinePendingMoves.p2.move;
+      state._onlineHitRolls = { p1: onlinePendingMoves.p1.hitRoll, p2: onlinePendingMoves.p2.hitRoll };
       onlinePendingMoves = {};
       els.onlineWaiting.classList.add('hidden');
       showBothPanels(); state.phase = 'both-chosen';
@@ -625,6 +701,9 @@ function setPhase(phase) {
   els.onlineWaiting.classList.add('hidden');
   const isMobile = window.innerWidth < 400;
 
+  // Reset dialog saved state so banner can be re-saved fresh each new phase
+  _savedBannerState = null;
+
   if (phase === 'p1-choose') {
     hideDialog();
     if (gameMode === 'online') {
@@ -675,13 +754,16 @@ async function resolveRound() {
   logEntry(`— ROUND ${state.round} —`, 'log-info');
   logEntry(`P1: ${m1.name}  |  ${p2Label}: ${m2.name}`, 'log-info');
 
-  // ===== ROLL ACCURACY =====
-  const p1Hit = rollAccuracy('p1', state.p1.move);
-  const p2Hit = rollAccuracy('p2', state.p2.move);
+  const p1Hit = (gameMode === 'online' && state._onlineHitRolls)
+    ? state._onlineHitRolls.p1
+    : rollAccuracy('p1', state.p1.move);
+  const p2Hit = (gameMode === 'online' && state._onlineHitRolls)
+    ? state._onlineHitRolls.p2
+    : rollAccuracy('p2', state.p2.move);
+  state._onlineHitRolls = null;
   roundHitResult.p1 = p1Hit;
   roundHitResult.p2 = p2Hit;
 
-  // Store block hit results for sequential-turn defence checks
   roundBlockHit.p1 = (state.p1.move === 'BLOCK') ? p1Hit : null;
   roundBlockHit.p2 = (state.p2.move === 'BLOCK') ? p2Hit : null;
 
@@ -689,7 +771,6 @@ async function resolveRound() {
   const p2Pct = getAccPct('p2', state.p2.move);
   logEntry(`P1 ACC:${p1Pct}% → ${p1Hit ? 'HIT' : 'MISS'} | ${p2Label} ACC:${p2Pct}% → ${p2Hit ? 'HIT' : 'MISS'}`, 'log-info');
 
-  // ===== UPDATE BLOCK STREAKS =====
   updateBlockStreak('p1', state.p1.move, p1Hit);
   updateBlockStreak('p2', state.p2.move, p2Hit);
 
@@ -725,7 +806,6 @@ async function resolveRound() {
   setPhase('p1-choose');
 }
 
-// ===== BLOCK STREAK TRACKING =====
 function updateBlockStreak(player, moveKey, hit) {
   if (moveKey === 'BLOCK') {
     if (hit) state[player].blockStreak++;
@@ -735,7 +815,6 @@ function updateBlockStreak(player, moveKey, hit) {
   }
 }
 
-// ===== SIMULTANEOUS TURNS =====
 async function applySimultaneous(m1, m2, p1Hit = true, p2Hit = true) {
   spawnClashText(m1.name, m2.name);
   await delay(600);
@@ -744,7 +823,6 @@ async function applySimultaneous(m1, m2, p1Hit = true, p2Hit = true) {
   const heal1   = (p1Hit && m1.heal) ? m1.heal : 0;
   const heal2   = (p2Hit && m2.heal) ? m2.heal : 0;
 
-  // Block only reduces damage if it SUCCEEDED (hit)
   const def2 = (p2Hit && m2.defence) ? m2.defence : 0;
   const def1 = (p1Hit && m1.defence) ? m1.defence : 0;
 
@@ -764,34 +842,28 @@ async function applySimultaneous(m1, m2, p1Hit = true, p2Hit = true) {
   updateHUD();
 }
 
-// ===== SINGLE TURN =====
 async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = false, hit = true) {
   const p2Label = gameMode === 'online' ? 'Opponent' : gameMode !== '2p' ? 'CPU' : 'P2';
   const attackerLabel = attacker === 'p1' ? 'Player 1' : p2Label;
   const defenderLabel = defender === 'p1' ? 'Player 1' : p2Label;
 
-  // ── MISS ──
   if (!hit) {
     let missMsg;
     if (atkMove.name === 'BLOCK') {
-      // Block failed: clear warning message, no defence this round
-      missMsg = `${attackerLabel}'s BLOCK FAILED!\nToo tired to hold guard!\nTaking full damage — streak reset!`;
+      missMsg = `${attackerLabel}'s BLOCK FAILED!\nToo tired to hold guard!`;
     } else if (atkMove.name === 'HEAL') {
-      missMsg = `${attackerLabel}'s HEAL fizzled!\nConcentration broken — no HP restored!`;
+      missMsg = `${attackerLabel}'s HEAL fizzled!\nConcentration broken!`;
     } else {
-      missMsg = `${attackerLabel}'s ${atkMove.name} MISSED!\nThe attack whiffed completely!`;
+      missMsg = `${attackerLabel}'s ${atkMove.name} MISSED!\nThe attack whiffed!`;
     }
     await showDialog(missMsg, 2000);
     await animateMiss(attacker, atkMove);
     return;
   }
 
-  // ── HIT ──
   const dmg = calcDamage(attacker, atkMove, defender, defMove);
   const heal = atkMove.heal || 0;
 
-  // Defence from defender's block only applies if defender's block HIT this round.
-  // We check roundBlockHit[defender] — null means they didn't use block, true/false = hit/miss.
   const defenderBlockHit = roundBlockHit[defender];
   const defenderDef = (defMove.defence > 0 && defenderBlockHit === true) ? defMove.defence : 0;
   const actualDmg = Math.max(0, dmg - defenderDef);
@@ -800,20 +872,20 @@ async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = fa
     const streak = state[attacker].blockStreak;
     const nextAcc = Math.round(getBlockAccuracy(streak) * 100);
     await showDialog(
-      `${attackerLabel} takes a defensive stance!\nIncoming damage reduced by 2.\n(Next BLOCK accuracy: ${nextAcc}%)`,
+      `${attackerLabel} takes a defensive stance!\nDamage reduced by 2. Next: ${nextAcc}%`,
       1800
     );
   } else if (atkMove.name === 'HEAL') {
-    await showDialog(`${attackerLabel} is recovering HP!\n+6 HP restored! (Max HP -2)`, 1600);
+    await showDialog(`${attackerLabel} is recovering!\n+6 HP restored! (Max HP -2)`, 1600);
   } else if (atkMove.name === 'COUNTER') {
     const isDefenderAttacking = ['ATK', 'HEAVY ATK'].includes(defMove.name);
     const isQuickAtk = defMove.name === 'QUICK ATK';
     if (isQuickAtk) {
-      await showDialog(`${attackerLabel}'s COUNTER failed!\n${defenderLabel}'s QUICK ATK was too fast!`, 2000);
-   } else if (!isDefenderAttacking) {
-  await showDialog(`${attackerLabel}'s COUNTER failed!\nNo attack to reflect — turn wasted!`, 2000);
+      await showDialog(`${attackerLabel}'s COUNTER failed!\nQUICK ATK was too fast!`, 2000);
+    } else if (!isDefenderAttacking) {
+      await showDialog(`${attackerLabel}'s COUNTER failed!\nNo attack to reflect!`, 2000);
     } else if (!roundHitResult[defender]) {
-  await showDialog(`${attackerLabel}'s COUNTER failed!\n${defenderLabel}'s attack missed — no damage to reflect!`, 2000);
+      await showDialog(`${attackerLabel}'s COUNTER failed!\nAttack missed — nothing to reflect!`, 2000);
     } else {
       await showDialog(`${attackerLabel}'s COUNTER activated!\nReflecting ${actualDmg} damage back!`, 2000);
     }
@@ -821,7 +893,7 @@ async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = fa
     if (actualDmg > 0) {
       await showDialog(`${attackerLabel}'s ${atkMove.name} hits!\n${defenderLabel} takes ${actualDmg} damage!`, 1600);
     } else {
-      await showDialog(`${attackerLabel}'s ${atkMove.name} was blocked!\n${defenderLabel}'s guard held firm!`, 1600);
+      await showDialog(`${attackerLabel}'s ${atkMove.name} blocked!\n${defenderLabel}'s guard held firm!`, 1600);
     }
   }
 
@@ -831,7 +903,6 @@ async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = fa
   updateHUD();
 }
 
-// ===== MISS ANIMATION =====
 async function animateMiss(attacker, atkMove) {
   const atkSprite = attacker === 'p1' ? els.p1Sprite : els.p2Sprite;
   atkSprite.style.transition = 'transform 120ms ease';
@@ -860,39 +931,25 @@ function spawnClashText(move1, move2) {
   const cy = rect.top + rect.height / 2;
   const isMobile = window.innerWidth < 480;
 
-  // First: CLASH!
   const el1 = document.createElement('div');
   el1.style.cssText = `
-    position:fixed;
-    left:${cx}px;
-    top:${cy}px;
-    font-family:var(--font-title);
-    font-size:${isMobile ? '1.2rem' : '1.8rem'};
-    color:#f7c948;
-    text-shadow:2px 2px 0 #000, 0 0 16px #f7c948;
-    pointer-events:none;
-    z-index:1000;
-    transform:translate(-50%,-50%);
+    position:fixed;left:${cx}px;top:${cy}px;
+    font-family:var(--font-title);font-size:${isMobile ? '1.2rem' : '1.8rem'};
+    color:#f7c948;text-shadow:2px 2px 0 #000,0 0 16px #f7c948;
+    pointer-events:none;z-index:1000;transform:translate(-50%,-50%);
     animation:dmgFloat 1.1s cubic-bezier(0.2,1.4,0.4,1) forwards;
   `;
   el1.textContent = 'CLASH!';
   document.body.appendChild(el1);
   setTimeout(() => el1.remove(), 1100);
 
-  // Second: move vs move (delayed)
   setTimeout(() => {
     const el2 = document.createElement('div');
     el2.style.cssText = `
-      position:fixed;
-      left:${cx}px;
-      top:${cy}px;
-      font-family:var(--font-title);
-      font-size:${isMobile ? '0.55rem' : '0.72rem'};
-      color:#f7c948;
-      text-shadow:1px 1px 0 #000, 0 0 10px #f7c948;
-      pointer-events:none;
-      z-index:1000;
-      transform:translate(-50%,-50%);
+      position:fixed;left:${cx}px;top:${cy}px;
+      font-family:var(--font-title);font-size:${isMobile ? '0.55rem' : '0.72rem'};
+      color:#f7c948;text-shadow:1px 1px 0 #000,0 0 10px #f7c948;
+      pointer-events:none;z-index:1000;transform:translate(-50%,-50%);
       animation:dmgFloat 1.1s cubic-bezier(0.2,1.4,0.4,1) forwards;
     `;
     el2.textContent = `${move1} vs ${move2}`;
@@ -900,21 +957,16 @@ function spawnClashText(move1, move2) {
     setTimeout(() => el2.remove(), 1100);
   }, 320);
 }
+
 function spawnMissText(target, label = 'MISS!') {
   const sprite = target === 'p1' ? els.p1Sprite : els.p2Sprite;
   const rect = sprite.getBoundingClientRect();
   const el = document.createElement('div');
   el.style.cssText = `
-    position:fixed;
-    left:${rect.left + rect.width / 2}px;
-    top:${rect.top}px;
-    font-family:var(--font-title);
-    font-size:${window.innerWidth < 480 ? '1.1rem' : '1.6rem'};
-    color:#888888;
-    text-shadow:2px 2px 0 #000,0 0 10px #444;
-    pointer-events:none;
-    z-index:1000;
-    transform:translate(-50%,-50%);
+    position:fixed;left:${rect.left + rect.width / 2}px;top:${rect.top}px;
+    font-family:var(--font-title);font-size:${window.innerWidth < 480 ? '1.1rem' : '1.6rem'};
+    color:#888888;text-shadow:2px 2px 0 #000,0 0 10px #444;
+    pointer-events:none;z-index:1000;transform:translate(-50%,-50%);
     animation:dmgFloat 0.9s cubic-bezier(0.2,1.4,0.4,1) forwards;
   `;
   el.textContent = label;
@@ -922,7 +974,6 @@ function spawnMissText(target, label = 'MISS!') {
   setTimeout(() => el.remove(), 900);
 }
 
-// ===== DAMAGE CALC =====
 function calcDamage(attacker, atkMove, defender, defMove) {
   if (atkMove.name === 'COUNTER') {
     if (defMove.name === 'QUICK ATK') {
@@ -935,13 +986,13 @@ function calcDamage(attacker, atkMove, defender, defMove) {
       return 0;
     }
     const defenderHit = roundHitResult[defender];
-if (!defenderHit) {
-  logEntry(`${attacker.toUpperCase()} COUNTER — attack missed, nothing to reflect!`, 'log-info');
-  return 0;
-}
-const defDmg = defMove.dmg || 0;
-logEntry(`${attacker.toUpperCase()} COUNTERS — reflects ${defDmg * 2} dmg!`, 'log-dmg');
-return defDmg * 2;
+    if (!defenderHit) {
+      logEntry(`${attacker.toUpperCase()} COUNTER — attack missed, nothing to reflect!`, 'log-info');
+      return 0;
+    }
+    const defDmg = defMove.dmg || 0;
+    logEntry(`${attacker.toUpperCase()} COUNTERS — reflects ${defDmg * 2} dmg!`, 'log-dmg');
+    return defDmg * 2;
   }
   return atkMove.dmg || 0;
 }
@@ -951,7 +1002,6 @@ function applyDamage(target, amount, source, srcMove) {
   state[target].hp = Math.max(0, state[target].hp - amount);
   const p2Label = gameMode === 'online' ? 'OPP' : gameMode !== '2p' ? 'CPU' : 'P2';
   logEntry(`${source === 'p2' ? p2Label : 'P1'} hits ${target === 'p2' ? p2Label : 'P1'} for ${amount} dmg!`, 'log-dmg');
-  // Counter shows as negative damage number (same colour purple, but -N not ×N)
   const isCounter = srcMove && srcMove.name === 'COUNTER';
   spawnDamageNumber(target, amount, isCounter ? 'counter' : 'dmg');
 }
@@ -1214,19 +1264,15 @@ function flashHitCinematic(player, color) {
   });
 }
 
-// ===== FLOATING NUMBERS =====
 function spawnDamageNumber(target, amount, type = 'dmg') {
   const sprite = target === 'p1' ? els.p1Sprite : els.p2Sprite;
   const rect = sprite.getBoundingClientRect();
   const el = document.createElement('div');
   const colors = { dmg: '#ff4444', heal: '#2ecc71', counter: '#b04aff' };
-  // Counter now shows -N (actual negative damage) instead of ×N
   const symbols = { dmg: `-${amount}`, heal: `+${amount}`, counter: `-${amount}` };
   const isMobile = window.innerWidth < 480;
   el.style.cssText = `
-    position:fixed;
-    left:${rect.left + rect.width / 2}px;
-    top:${rect.top}px;
+    position:fixed;left:${rect.left + rect.width / 2}px;top:${rect.top}px;
     font-family:var(--font-title);
     font-size:${isMobile ? '1.4rem' : (type === 'counter' ? '2.2rem' : amount >= 2 ? '2rem' : '1.6rem')};
     color:${colors[type] || colors.dmg};
