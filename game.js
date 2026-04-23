@@ -1220,6 +1220,8 @@ async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = fa
     );
   } else if (atkMove.name === 'HEAL') {
     await showDialog(`${attackerLabel} is recovering!\n+6 HP restored! (Max HP -2)`, 1600);
+  } else if (atkMove.name === 'QUICK_ATK' && defMove.name === 'COUNTER') {
+    await showDialog(`${attackerLabel}'s QUICK ATK punishes the COUNTER!\nToo fast to reflect — ×2 damage!`, 2000);
   } else if (atkMove.name === 'COUNTER') {
     const isDefenderAttacking = ['ATK', 'HEAVY ATK'].includes(defMove.name);
     const isQuickAtk = defMove.name === 'QUICK ATK';
@@ -1317,7 +1319,11 @@ function spawnMissText(target, label = 'MISS!') {
   setTimeout(() => el.remove(), 900);
 }
 
-function calcDamage(attacker, atkMove, defender, defMove) {
+if (atkMove.name === 'QUICK_ATK' && defMove.name === 'COUNTER') {
+    logEntry(`${attacker.toUpperCase()} QUICK ATK — too fast, punishes COUNTER! ×2!`, 'log-dmg');
+    return 2;
+  }
+
   if (atkMove.name === 'COUNTER') {
     if (defMove.name === 'QUICK ATK') {
       logEntry(`${attacker.toUpperCase()} COUNTER — too slow for QUICK ATK!`, 'log-info');
