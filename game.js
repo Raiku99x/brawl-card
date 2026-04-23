@@ -12,12 +12,12 @@ const supabaseClient = window.supabase.createClient(
 );
 
 const MOVES = {
-  ATK:       { name: 'ATK',       dmg: 2,    priority: 0,  heal: 0, defence: 0, emoji: '👊' },
-  QUICK_ATK: { name: 'QUICK ATK', dmg: 1,    priority: 1,  heal: 0, defence: 0, emoji: '⚡' },
-  HEAVY_ATK: { name: 'HEAVY ATK', dmg: 4,    priority: -1, heal: 0, defence: 0, emoji: '💥' },
-  BLOCK:     { name: 'BLOCK',     dmg: 0,    priority: 2,  heal: 0, defence: 2, emoji: '🛡️' },
-  COUNTER:   { name: 'COUNTER',   dmg: 'x2', priority: -2, heal: 0, defence: 0, emoji: '🔄' },
-  HEAL:      { name: 'HEAL',      dmg: 0,    priority: 2,  heal: 6, defence: 0, emoji: '💚' },
+  ATK:       { name: 'ATK',       dmg: 10,   priority: 0,  heal: 0,  defence: 0,  emoji: '👊' },
+  QUICK_ATK: { name: 'QUICK ATK', dmg: 5,    priority: 1,  heal: 0,  defence: 0,  emoji: '⚡' },
+  HEAVY_ATK: { name: 'HEAVY ATK', dmg: 20,   priority: -1, heal: 0,  defence: 0,  emoji: '💥' },
+  BLOCK:     { name: 'BLOCK',     dmg: 0,    priority: 2,  heal: 0,  defence: 10, emoji: '🛡️' },
+  COUNTER:   { name: 'COUNTER',   dmg: 'x2', priority: -2, heal: 0,  defence: 0,  emoji: '🔄' },
+  HEAL:      { name: 'HEAL',      dmg: 0,    priority: 2,  heal: 30, defence: 0,  emoji: '💚' },
 };
 
 const MOVE_KEYS = Object.keys(MOVES);
@@ -55,7 +55,7 @@ const TIMER_CONFIG = {
   MOVE_TIME:  15,
   SUDDEN_DEATH_MOVE_TIME: 30,
   BANK_TIME:  180,
-  MATCH_TIME: 10,
+  MATCH_TIME: 360,
 };
 
 const SUDDEN_DEATH_BANNED = new Set(['BLOCK', 'HEAL']);
@@ -528,8 +528,8 @@ function hideTiedOverlay() {
 
 function startGame() {
   state = {
-    p1: { hp: 20, maxHp: 20, move: null, blockStreak: 0 },
-    p2: { hp: 20, maxHp: 20, move: null, blockStreak: 0 },
+    p1: { hp: 100, maxHp: 100, move: null, blockStreak: 0 },
+    p2: { hp: 100, maxHp: 100, move: null, blockStreak: 0 },
     round: 1,
     phase: 'p1-choose',
     p1MoveHistory: [],
@@ -1158,7 +1158,7 @@ async function applyTurn(attacker, atkMove, defender, defMove, isSecondTurn = fa
       1800
     );
   } else if (atkMove.name === 'HEAL') {
-    await showDialog(`${attackerLabel} is recovering!\n+6 HP restored! (Max HP -2)`, 1600);
+    await showDialog(`${attackerLabel} is recovering!\n+30 HP restored! (Max HP -10)`, 1600);
   } else if (atkMove.name === 'QUICK_ATK' && defMove.name === 'COUNTER') {
     await showDialog(`${attackerLabel}'s QUICK ATK punishes the COUNTER!\nToo fast to reflect — ×2 damage!`, 2000);
   } else if (atkMove.name === 'COUNTER') {
@@ -1261,7 +1261,7 @@ function spawnMissText(target, label = 'MISS!') {
 function calcDamage(attacker, atkMove, defender, defMove) {
   if (atkMove.name === 'QUICK ATK' && defMove.name === 'COUNTER') {
     logEntry(`${attacker.toUpperCase()} QUICK ATK punishes COUNTER! ×2!`, 'log-dmg');
-    return 2;
+    return 10;
   }
   if (atkMove.name === 'COUNTER') {
     if (defMove.name === 'QUICK ATK') {
@@ -1296,7 +1296,7 @@ function applyDamage(target, amount, source, srcMove) {
 
 function applyHealEffect(player, amount, move) {
   if (amount <= 0) return;
-  state[player].maxHp = Math.max(1, state[player].maxHp - 2);
+  state[player].maxHp = Math.max(1, state[player].maxHp - 10);
   state[player].hp = Math.min(state[player].maxHp, state[player].hp + amount);
   const p2Label = gameMode === 'online' ? 'OPP' : gameMode !== '2p' ? 'CPU' : 'P2';
   logEntry(`${player === 'p2' ? p2Label : 'P1'} heals! HP: ${state[player].hp}/${state[player].maxHp}`, 'log-heal');
