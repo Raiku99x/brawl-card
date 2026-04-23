@@ -1,24 +1,9 @@
 // ============================================
 //   BRAWL CARDS — game.js
-//   • Local 2P, CPU modes
-//   • Online multiplayer via Supabase Realtime
-//   • Mobile-responsive fixes
-//   • Card sprite support (p1.png / p2.png)
-//   • ACCURACY SYSTEM
-//     ATK=100%, QUICK ATK=120%, HEAVY ATK=80%
-//     BLOCK degrades: 100/80/50/10/1% per streak
-//     COUNTER & HEAL = always 100%
-//   • TRIPLE-TIMER SYSTEM
-//     Move Time: 15s per turn (auto-pick ATK on expiry)
-//     Player Bank: 3min chess clock per player
-//     Match Clock: 6min hard ceiling
-//     Sudden Death: Block/Heal locked, highest HP wins
 // ============================================
 
-// ─── SUPABASE CONFIG ───────────────────────
 const SUPABASE_URL = 'https://oikumdcokfhrzuvgmxku.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9pa3VtZGNva2Zocnp1dmdteGt1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4NzA2NTYsImV4cCI6MjA4ODQ0NjY1Nn0.X_PzXZswIFPKZddV24rcSql6PbVoR0vmuKdn3Xh_qAQ';
-// ───────────────────────────────────────────
 
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
@@ -26,7 +11,6 @@ const supabaseClient = window.supabase.createClient(
   { auth: { persistSession: false, autoRefreshToken: false } }
 );
 
-// ===== MOVE DEFINITIONS =====
 const MOVES = {
   ATK:       { name: 'ATK',       dmg: 2,    priority: 0,  heal: 0, defence: 0, emoji: '👊' },
   QUICK_ATK: { name: 'QUICK ATK', dmg: 1,    priority: 1,  heal: 0, defence: 0, emoji: '⚡' },
@@ -38,7 +22,6 @@ const MOVES = {
 
 const MOVE_KEYS = Object.keys(MOVES);
 
-// ===== ACCURACY SYSTEM =====
 const MOVE_ACCURACY = {
   ATK:       1.00,
   QUICK_ATK: 1.20,
@@ -68,15 +51,13 @@ function getAccPct(player, moveKey) {
   return Math.round(getMoveAccuracy(player, moveKey) * 100);
 }
 
-// ===== TRIPLE-TIMER CONFIG =====
 const TIMER_CONFIG = {
   MOVE_TIME:  15,
   SUDDEN_DEATH_MOVE_TIME: 30,
-  BANK_TIME:  180,  // 3 minutes per player
-  MATCH_TIME: 10,  // 6 minutes total
+  BANK_TIME:  180,
+  MATCH_TIME: 10,
 };
 
-// Sudden death moves — Block and Heal are locked out
 const SUDDEN_DEATH_BANNED = new Set(['BLOCK', 'HEAL']);
 
 let timerState = {
@@ -89,10 +70,8 @@ let timerState = {
   suddenDeath: false,
 };
 
-// ===== GAME CONFIG =====
 let gameMode = '2p';
 
-// ===== ONLINE STATE =====
 let onlineRoom = null;
 let onlineRole = null;
 let onlineChannel = null;
@@ -101,7 +80,6 @@ let onlineOpponentConnected = false;
 let onlineJoinTimeout = null;
 let pingRetryInterval = null;
 
-// ===== GAME STATE =====
 let state = {
   p1: { hp: 20, maxHp: 20, move: null, blockStreak: 0 },
   p2: { hp: 20, maxHp: 20, move: null, blockStreak: 0 },
@@ -114,7 +92,6 @@ let state = {
 let roundBlockHit = { p1: null, p2: null };
 let roundHitResult = { p1: null, p2: null };
 
-// ===== DOM REFS =====
 const screens = {
   title:  document.getElementById('screen-title'),
   rules:  document.getElementById('screen-rules'),
@@ -158,7 +135,6 @@ const els = {
   joinCodeInput:  document.getElementById('join-code-input'),
   btnJoinConfirm: document.getElementById('btn-join-confirm'),
   roomStatus:     document.getElementById('room-status'),
-  // Triple-timer elements
   timerBar:       document.getElementById('timer-bar'),
   matchClock:     document.getElementById('match-clock'),
   moveCountdown:  document.getElementById('move-countdown'),
@@ -175,14 +151,12 @@ function setCardLabel(spriteEl, text) {
   if (label) label.textContent = text;
 }
 
-// ===== SCREEN NAV =====
 function showScreen(name) {
   Object.values(screens).forEach(s => s.classList.remove('active'));
   screens[name].classList.add('active');
   if (name === 'title') screens.title.scrollTop = 0;
 }
 
-// ===== TITLE BUTTONS =====
 document.getElementById('btn-start').addEventListener('click', () => {
   gameMode = '2p'; startGame(); showScreen('game');
 });
@@ -199,7 +173,6 @@ document.getElementById('btn-rematch').addEventListener('click', () => {
   startGame(); showScreen('game');
 });
 
-// ===== ONLINE ROOM UI =====
 els.btnCreateRoom.addEventListener('click', createOnlineRoom);
 els.btnJoinRoom.addEventListener('click', () => {
   els.joinInputWrap.classList.toggle('hidden');
@@ -221,7 +194,6 @@ function showRoomStatus(msg, type = 'waiting') {
   els.roomStatus.classList.remove('hidden');
 }
 
-// ===== ONLINE: CREATE ROOM =====
 async function createOnlineRoom() {
   const code = generateRoomCode();
   onlineRoom = code;
@@ -230,7 +202,6 @@ async function createOnlineRoom() {
   await subscribeToRoom(code);
 }
 
-// ===== ONLINE: JOIN ROOM =====
 async function joinOnlineRoom(code) {
   code = code.toUpperCase().trim();
   showRoomStatus(`Connecting to ${code}...`, 'waiting');
@@ -260,7 +231,6 @@ async function joinOnlineRoom(code) {
   }, 400);
 }
 
-// ===== SUBSCRIBE TO ROOM =====
 function subscribeToRoom(code) {
   return new Promise((resolve) => {
     if (onlineChannel) { onlineChannel.unsubscribe(); onlineChannel = null; }
@@ -341,8 +311,6 @@ function generateRoomCode() {
   return code;
 }
 
-// ===== TRIPLE-TIMER FUNCTIONS =====
-
 function fmtTime(s) {
   s = Math.max(0, Math.ceil(s));
   return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
@@ -362,9 +330,9 @@ function resetTimers() {
   updateTimerHUD();
   if (timerState._matchTimer) clearInterval(timerState._matchTimer);
   timerState._matchTimer = setInterval(() => {
-      timerState.matchLeft = Math.max(0, timerState.matchLeft - 0.1);
-      updateTimerHUD();
-      if (timerState.matchLeft <= 0) {
+    timerState.matchLeft = Math.max(0, timerState.matchLeft - 0.1);
+    updateTimerHUD();
+    if (timerState.matchLeft <= 0) {
       clearInterval(timerState._matchTimer);
       const waitForRound = setInterval(() => {
         if (state.phase === 'p1-choose') {
@@ -373,8 +341,8 @@ function resetTimers() {
         }
       }, 200);
     }
-    }, 100);
-  }
+  }, 100);
+}
 
 function stopMoveTimer() {
   if (timerState.activeTimer) {
@@ -399,14 +367,12 @@ function startMoveTimer(player) {
 
     updateTimerHUD();
 
-    // Match ceiling — sudden death
     if (timerState.matchLeft <= 0) {
       stopMoveTimer();
       triggerSuddenDeath();
       return;
     }
 
-    // Move time or bank expired — auto-pick ATK
     const bankLeft = player === 'p1' ? timerState.p1BankLeft : timerState.p2BankLeft;
     if (timerState.moveLeft <= 0 || bankLeft <= 0) {
       stopMoveTimer();
@@ -418,14 +384,12 @@ function startMoveTimer(player) {
 function updateTimerHUD() {
   if (!els.timerBar) return;
 
-  // Match clock (top bar)
   if (els.matchClock) {
     els.matchClock.textContent = fmtTime(timerState.matchLeft);
     const mpct = timerState.matchLeft / TIMER_CONFIG.MATCH_TIME;
     els.matchClock.className = 'match-clock' + (mpct > 0.3 ? '' : mpct > 0.15 ? ' warn' : ' danger');
   }
 
-  // Move countdown (center of timer bar)
   if (els.moveCountdown) {
     const mv = Math.ceil(timerState.moveLeft);
     els.moveCountdown.textContent = mv;
@@ -433,7 +397,6 @@ function updateTimerHUD() {
     els.moveCountdown.className = 'move-countdown' + (mpct > 0.4 ? '' : mpct > 0.2 ? ' warn' : ' danger');
   }
 
-  // Move bar fill
   if (els.moveFill) {
     const pct = Math.max(0, timerState.moveLeft / TIMER_CONFIG.MOVE_TIME * 100);
     els.moveFill.style.width = pct + '%';
@@ -441,7 +404,6 @@ function updateTimerHUD() {
     els.moveFill.style.background = mpct > 0.4 ? 'var(--accent)' : mpct > 0.2 ? 'var(--p1)' : 'var(--p2)';
   }
 
-  // P1 bank
   if (els.p1BankFill && els.p1BankVal) {
     const p1pct = Math.max(0, timerState.p1BankLeft / TIMER_CONFIG.BANK_TIME * 100);
     els.p1BankFill.style.width = p1pct + '%';
@@ -450,7 +412,6 @@ function updateTimerHUD() {
     els.p1BankVal.className = 'bank-val' + (p1pct <= 15 ? ' danger' : p1pct <= 30 ? ' warn' : '');
   }
 
-  // P2 bank
   if (els.p2BankFill && els.p2BankVal) {
     const p2pct = Math.max(0, timerState.p2BankLeft / TIMER_CONFIG.BANK_TIME * 100);
     els.p2BankFill.style.width = p2pct + '%';
@@ -466,11 +427,9 @@ function handleTimeExpiry(player) {
   const label = player === 'p1' ? 'P1' : (gameMode !== '2p' && gameMode !== 'online' ? 'CPU' : 'P2');
   logEntry(`⏱ ${label} ${reason}! AUTO: ATK`, 'log-dmg');
 
-  // Force ATK card selection
   const container = player === 'p1' ? els.p1Cards : els.p2Cards;
   const atkCard = [...container.querySelectorAll('.card')].find(c => c.dataset.move === 'ATK');
   if (atkCard) {
-    // Brief visual flash on the ATK card before selecting
     atkCard.style.outline = '2px solid var(--p2)';
     setTimeout(() => {
       atkCard.style.outline = '';
@@ -483,9 +442,7 @@ async function triggerSuddenDeath() {
   stopMoveTimer();
   timerState.suddenDeath = true;
 
-  // If HP is not tied, highest HP wins immediately
   if (state.p1.hp !== state.p2.hp) {
-    // Kill the lower HP player
     if (state.p1.hp < state.p2.hp) state.p1.hp = 0;
     else state.p2.hp = 0;
     updateHUD();
@@ -498,10 +455,9 @@ async function triggerSuddenDeath() {
   await delay(4500);
   hideSuddenDeathOverlay();
 
-  // Prevent match clock from triggering again
   timerState.matchLeft = 99999;
 
-state.p1.move = null;
+  state.p1.move = null;
   state.p2.move = null;
   buildCards('p1');
   buildCards('p2');
@@ -510,7 +466,6 @@ state.p1.move = null;
   unlockCards('p1');
   unlockCards('p2');
 
-  // Start final round
   setPhase('p1-choose');
 }
 
@@ -571,7 +526,6 @@ function hideTiedOverlay() {
   }, 400);
 }
 
-// ===== GAME INIT =====
 function startGame() {
   state = {
     p1: { hp: 20, maxHp: 20, move: null, blockStreak: 0 },
@@ -591,7 +545,6 @@ function startGame() {
   updateModeUI();
   hideDialog();
   resetTimers();
-  // Show timer bar during game
   if (els.timerBar) els.timerBar.classList.remove('hidden');
   hideSuddenDeathOverlay();
   setPhase('p1-choose');
@@ -645,7 +598,6 @@ function applyOnlinePanelLayout() {
   oppPanel.querySelectorAll('.card').forEach(c => c.classList.add('online-hidden'));
 }
 
-// ===== POKÉMON DIALOGUE =====
 let dialogQueue = [];
 let isDialogBusy = false;
 let _savedBannerState = null;
@@ -730,7 +682,6 @@ function setDialogImmediate(text) {
   els.pokeDialogText.textContent = text;
 }
 
-// ===== BUILD CARDS =====
 function buildCards(player) {
   const container = player === 'p1' ? els.p1Cards : els.p2Cards;
   container.innerHTML = '';
@@ -741,7 +692,6 @@ function buildCards(player) {
     card.dataset.move = key;
     card.dataset.player = player;
 
-    // In sudden death, mark banned cards
     const banned = timerState.suddenDeath && SUDDEN_DEATH_BANNED.has(key);
     if (banned) {
       card.classList.add('disabled', 'sd-banned');
@@ -799,12 +749,9 @@ function refreshAccDisplay(player) {
   });
 }
 
-// ===== SELECT MOVE =====
 function selectMove(player, moveKey, cardEl) {
-  // Block banned moves in sudden death
   if (timerState.suddenDeath && SUDDEN_DEATH_BANNED.has(moveKey)) return;
 
-  // Stop the timer for the choosing player
   clearInterval(timerState.activeTimer);
   timerState.activeTimer = null;
 
@@ -857,7 +804,6 @@ function selectMove(player, moveKey, cardEl) {
   }
 }
 
-// ===== CPU MOVE LOGIC =====
 async function triggerCpuMove() {
   els.cpuThinking.classList.remove('hidden');
   els.phaseBanner.classList.add('hidden');
@@ -883,7 +829,6 @@ function pickCpuMove() {
 }
 
 function pickEasyMove() {
-  // In sudden death, CPU can't pick BLOCK or HEAL
   const banned = timerState.suddenDeath ? SUDDEN_DEATH_BANNED : new Set();
   const roll = Math.random();
   if (!banned.has('BLOCK') && roll < 0.15) return 'BLOCK';
@@ -938,7 +883,6 @@ function weightedPick(weights) {
   return weights[weights.length - 1].key;
 }
 
-// ===== LOCK / UNLOCK =====
 function lockCards(player) {
   const container = player === 'p1' ? els.p1Cards : els.p2Cards;
   container.querySelectorAll('.card').forEach(c => {
@@ -950,7 +894,6 @@ function unlockCards(player) {
   const container = player === 'p1' ? els.p1Cards : els.p2Cards;
   container.querySelectorAll('.card').forEach(c => {
     c.classList.remove('disabled', 'selected-p1', 'selected-p2', 'online-hidden');
-    // Re-apply sudden death bans
     if (timerState.suddenDeath && SUDDEN_DEATH_BANNED.has(c.dataset.move)) {
       c.classList.add('disabled', 'sd-banned');
     }
@@ -975,7 +918,6 @@ function showBothPanels() {
   els.p2Panel.classList.remove('panel-active');
 }
 
-// ===== SET PHASE =====
 function setPhase(phase) {
   state.phase = phase;
   const banner = els.phaseBanner;
@@ -1021,7 +963,6 @@ function setPhase(phase) {
       if (gameMode !== '2p') { els.p2SelDisp.textContent = '— CPU WILL CHOOSE —'; showActivePanel('p1'); }
       else showActivePanel('p1');
     }
-    // Start the move timer for p1 (or the online player)
     startMoveTimer(gameMode === 'online' ? onlineRole : 'p1');
 
   } else if (phase === 'p2-choose') {
@@ -1045,7 +986,6 @@ function setPhase(phase) {
   }
 }
 
-// ===== RESOLVE ROUND =====
 els.btnResolve.addEventListener('click', resolveRound);
 
 async function resolveRound() {
@@ -1112,8 +1052,7 @@ async function resolveRound() {
     return;
   }
 
-  // After sudden death round — highest HP wins, no more rounds
-if (timerState.suddenDeath) {
+  if (timerState.suddenDeath) {
     await delay(400);
     if (state.p1.hp < state.p2.hp) {
       showTiedOverlay();
@@ -1319,11 +1258,11 @@ function spawnMissText(target, label = 'MISS!') {
   setTimeout(() => el.remove(), 900);
 }
 
-if (atkMove.name === 'QUICK_ATK' && defMove.name === 'COUNTER') {
-    logEntry(`${attacker.toUpperCase()} QUICK ATK — too fast, punishes COUNTER! ×2!`, 'log-dmg');
+function calcDamage(attacker, atkMove, defender, defMove) {
+  if (atkMove.name === 'QUICK ATK' && defMove.name === 'COUNTER') {
+    logEntry(`${attacker.toUpperCase()} QUICK ATK punishes COUNTER! ×2!`, 'log-dmg');
     return 2;
   }
-
   if (atkMove.name === 'COUNTER') {
     if (defMove.name === 'QUICK ATK') {
       logEntry(`${attacker.toUpperCase()} COUNTER — too slow for QUICK ATK!`, 'log-info');
@@ -1364,7 +1303,6 @@ function applyHealEffect(player, amount, move) {
   spawnDamageNumber(player, amount, 'heal');
 }
 
-// ===== ANIMATION ENGINE =====
 let particleCanvas, particleCtx;
 function initParticleCanvas() {
   if (particleCanvas) return;
